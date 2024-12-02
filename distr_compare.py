@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 import multiprocessing as mp
+
+import distr_dens
 import distr_dens as dens
 import distr_visual as vis
 
@@ -52,57 +54,72 @@ def dataFilter(rawdata, borders):
     dataFiltered = rawdata[:, np.where(condition)]
     return dataFiltered
 
-def func_process(destination,roiForAll,queue):
+def func_process(destination,roiForAll,sbplt,result_dict):
     with h5py.File(destination,'r') as f:
         features = f['roi2_e033/00/features']
         setnum = int(max(features[0])) + 1
 
-        setnum = 1000 # Ограничение для отладки
+        setnum = 100 # Ограничение для отладки
 
-        xDataSummary = []
-
-        fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
-
+        xData = []
+        yData = []
         for ID in tqdm(range(setnum)):
             index = indexes(features, ID)
             data = np.vstack((features[1][index], features[2][index]))
             # data - one spec
             dataFiltered = dataFilter(data, roiForAll)
-            #vis.visual_scatter(dataFiltered, refs=ref, subplot=ax1)
             # only m/z for kde (maybe i should use intensity or int. area as weights)
-            xDataSummary.append(dataFiltered[0])
+            #print(dataFiltered)
+            yData.append(dataFiltered[1])
+            xData.append(dataFiltered[0])
 
-        densROI = dens.kdePython(np.hstack(xDataSummary)[0], region=roiForAll, show=True, bw='ISJ', color='g',
-                                 subplot=ax1)
+
+        xDataSummary = np.hstack(xData)[0]
+        yDataSummary = np.hstack(yData)[0]
+        DataSummary = np.vstack((xDataSummary,yDataSummary))
+        densROI = dens.kdePython(xDataSummary, region=roiForAll, show=False, bw='ISJ', color='g',
+                                 subplot=sbplt)
         locMax, locMin = dens.findpeaks(densROI)
 
-        out = (dataFiltered,densROI,locMax)
-        queue.put(out)
+        out = {"DS":DataSummary,'DENS':densROI,"MAX":locMax}
+        result_dict.update(out)
 
 def main():
-    resultQueue = mp.Queue()
+    manager = mp.Manager()
     processes = []
-
+    result_total = [manager.dict() for _ in range(len(FileName))]
     regions = roi(ref,delta=2)
 
     print(regions)
     roiForAll = regions[int(input('Enter number of ROI:')) - 1]
     print(roiForAll)
 
-    for fileHDF in FileName:
-        p = mp.Process(target=func_process, args=(folderHDF+fileHDF,roiForAll,resultQueue))
+    fig, axes = plt.subplots(2, 1, sharex=True)
+
+    for number in range(len(FileName)):
+
+        p = mp.Process(target=func_process, args=(folderHDF+FileName[number],roiForAll,axes[number],result_total[number]))
         processes.append(p)
         p.start()
 
     for p in processes:
         p.join()
 
-    results = []
-    while not resultQueue.empty():
-        results.append(resultQueue.get())
-
     print('Completed\n')
-    print(f'Results: {results}')
+
+    for i in range(len(FileName)):
+        visRawData = result_total[i]['DS']
+        visDens = result_total[i]['DENS']
+        print(visRawData)
+        print(roiForAll)
+
+        distr_dens.cluster(visRawData[0].reshape(-1,1),show=True,subplot=axes[i])
+        #vis.visual_scatter(visRawData, refs=[], subplot=axes[i])
+        vis.kdeVis(data=visDens, rawdata=visRawData, kdeType='ISJ', show_input=True, color='k', subplot=axes[i])
+        vis.visual_additional(limmin=roiForAll[0], limmax=roiForAll[1], subplot=axes[i])
+
+
+    vis.show()
 
 
 if __name__ == '__main__':
