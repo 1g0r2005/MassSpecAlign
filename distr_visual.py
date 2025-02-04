@@ -43,5 +43,8 @@ def dbscanVis(data,labels,uniq,subplot = plt):
         class_member_mask = (labels == k)
         subplot.scatter(data[class_member_mask],np.zeros_like(data[class_member_mask]),c=[col],marker=marker,label=f'cl {k}' if k!=-1 else "noise")
 
+def histogramm(data,bins,alpha=1,subplot=plt):
+    subplot.hist(data,bins=bins,alpha=alpha)
+
 def show():
     plt.show()

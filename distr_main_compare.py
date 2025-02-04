@@ -59,7 +59,7 @@ def func_process(destination,roiForAll,sbplt,result_dict):
         features = f['roi2_e033/00/features']
         setnum = int(max(features[0])) + 1
 
-        setnum = 100 # Ограничение для отладки
+        #setnum = 2000 # Ограничение для отладки
 
         xData = []
         yData = []

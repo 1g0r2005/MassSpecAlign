@@ -1,4 +1,4 @@
-'''module for density estimation'''
+"""module for density estimation"""
 import rpy2
 from rpy2 import robjects
 import rpy2.robjects.packages  as pkgs
@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from KDEpy import FFTKDE
 
 
-def initR():
+def initr():
     global base
     global utils
     global stats
@@ -23,9 +23,9 @@ def initR():
 
 def kdeR(rawdata,region,show=True,bw='nrd0',adjust=1,color='k',subplot=plt): #should try SJ
     """
-    more comlex algorithm for multimodal data using R language packages
+    more complex algorithm for multimodal data using R language packages
     """
-    initR()
+    initr()
     rawdata = np.array(rawdata,dtype="float64")
     dens = stats.density(rawdata,bw=bw,adjust=adjust)
     #base.plot(dens,main = "KDE")
@@ -41,7 +41,7 @@ def kdePython(rawdata,region,show=True,bw='ISJ',color='k',subplot=plt):
     region - borders for kdeBandwidth
     show - draw matplotlib graph if True
     """
-    initR()
+    initr()
     kde = FFTKDE(kernel='biweight', bw=bw)
     x_eval = np.linspace(region[0],region[1])
     kde_values = kde.fit(rawdata).evaluate(x_eval)
@@ -53,7 +53,7 @@ def kdePython(rawdata,region,show=True,bw='ISJ',color='k',subplot=plt):
 
 def findpeaks(dens):
     """
-    find local maxima points and clasters
+    find local maxima points and clusters
     """
     ex_code = """
         local_extrema <- function(points){
@@ -73,9 +73,9 @@ def findpeaks(dens):
     """
 
     robjects.r(ex_code)
-    rLocalExtrema = robjects.globalenv['local_extrema']
-    localMinima,localMaxima = rLocalExtrema(dens)
-    return localMaxima,localMinima
+    rlocalextrema = robjects.globalenv['local_extrema']
+    localminima,localmaxima = rlocalextrema(dens)
+    return localmaxima,localminima
 
 def opt_epsilon(distances):
     dy = np.gradient(distances)
@@ -83,29 +83,32 @@ def opt_epsilon(distances):
 
     curv = np.abs(d2y)/(1+dy**2)**(3/2)
 
-    index = np.argmin(curv)
+    index = np.argmax(curv)
     return distances[index]
 
 def k_dist(data):
-    x = np.ravel(data)
-    fake_y = np.full(x.shape,1)
-    samples = np.dstack([x,fake_y])[0]
+    print('----------------')
+    x = np.sort(np.unique(np.ravel(data)))
+    print('x ', x)
 
-    print(sa)
-    neigh = NearestNeighbors(n_neighbors=2)
-    neigh.fit(samples)
+    left,right = np.full(x.shape,np.inf),np.full(x.shape,np.inf)
+    for i in range(x.shape[0]):
+        if i != 0:
+            left[i] = abs(x[i] - x[i - 1])
+        if i != x.shape[0] - 1:
+            right[i] = abs(x[i] - x[i + 1])
 
-    distances, indices = neigh.kneighbors(samples)
-    distances = np.sort(distances, axis=0)
-    distances = distances[:, 1]
+    distances = np.sort(np.minimum(left,right))
+    print('dist ',distances)
+    print('----------------')
     return distances
 
 def cluster(data,show=False,subplot=plt):
     """
     DBSCAN clustering
     """
-    #epsilon = opt_epsilon(k_dist(data))
-    labels = DBSCAN(eps=0.5, min_samples=2).fit_predict(data)
+    epsilon = opt_epsilon(k_dist(data))
+    labels = DBSCAN(eps=epsilon, min_samples=2).fit_predict(data)
     uniq_labels = set(labels)-{-1}
     n_clusters_ = len(uniq_labels)
 
