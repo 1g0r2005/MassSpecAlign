@@ -3,7 +3,10 @@ import os
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import plotly.express as px
 from numba import jit
+from scipy import stats
 from tqdm import tqdm
 
 FileName = ('E031_032_033_5mg_60C_90sec_9AA_161023_rawdata.hdf5',
@@ -15,8 +18,9 @@ folderHDF = 'HDF\\Data\\'
 
 cash = 'Cash\\cash.hdf5'
 
-ref = [193.07712, 194.0804748353425, 195.08382967068502, 383.13021993, 384.1425151646575, 385.14587, 386.1492248353425,
-       387.152579670685]
+ref = np.array(
+    [193.07712, 194.0804748353425, 195.08382967068502, 383.13021993, 384.1425151646575, 385.14587, 386.1492248353425,
+     387.152579670685])
 
 
 @jit(nopython=True)
@@ -66,6 +70,31 @@ def indexes(dataset, ds_id: int):
     return np.where(index_data == ds_id)
 
 
+def nearest(data, ref_dots):
+    dist = np.abs(data[:, None] - ref_dots)
+    nearest_id = np.argmin(dist, axis=1)
+    nearest_dots = ref_dots[nearest_id.astype(int)]
+    return np.vstack((data, data - nearest_dots, nearest_id))
+
+
+def bin_stat_func(dist, dist_to_ref, resolution=5, max_bin=100):
+    bins_calc = int(dist_to_ref.max() - dist_to_ref.min() / resolution)
+    bins = bins_calc if bins_calc < max_bin else max_bin
+    stat_res = stats.binned_statistic(dist_to_ref, dist, bins=bins, statistic='max')
+    return stat_res
+
+
+def bin_stat_show(stat_res):
+    bins = stat_res.bin_edges
+    bin_center = (bins[:-1] + bins[1:]) / 2
+
+    bin_means = stat_res.statistic
+
+    df = pd.DataFrame({'bin_center': bin_center, 'bin_mean': bin_means})
+    fig = px.bar(df, x='bin_center', y='bin_mean')
+
+    fig.show()
+
 def main():
     with h5py.File(os.path.join('..', folderHDF, FileName[0]), 'r') as old_raw:
         with h5py.File(os.path.join('..', folderHDF, FileName[1]), 'r') as old_aln:
@@ -77,7 +106,6 @@ def main():
             features_aln = old_aln['roi2_e033/00/features']
 
             set_num = int(max(features_raw[0])) + 1
-            set_num = 100
 
             for ID in tqdm(range(set_num)):
                 index_raw = indexes(features_raw, ID)
@@ -92,48 +120,23 @@ def main():
                 data_raw_mz = data_raw[0]
                 data_aln_mz = data_aln[0]
 
+
                 if data_raw_mz.size != data_aln_mz.size:
-                    data_raw_opt, data_aln_opt = opt_strip(*get_long_and_short(data_raw_mz, data_aln_mz))
-                    dist_array = data_aln_opt - data_raw_opt
+                    data_raw_mz, data_aln_mz = opt_strip(*get_long_and_short(data_raw_mz, data_aln_mz))
+                    dist_array = data_aln_mz - data_raw_mz
                 else:
                     dist_array = data_aln_mz - data_raw_mz
+
+                _, dist_to_ref, _ = nearest(data_raw_mz, ref)  # data, dist to ref, id of ref
 
                 score = np.max(np.abs(dist_array))
                 if score > 1:
                     continue
-                dot_array_pre.append(dist_array)
+                dot_array_pre.append(np.vstack((dist_array, dist_to_ref)))
 
     dot_array = np.hstack(dot_array_pre)
-
-    max_pos = np.max(dot_array)
-    min_pos = np.min(dot_array)
-
-    width = 0.01
-
-    cols = int(np.ceil((max_pos - min_pos) / width))
-    borders = np.linspace(min_pos, max_pos, cols + 1)
-
-    height, bord_hist = np.histogram(dot_array, borders)
-
-    ax1.hist(dot_array, bins=borders, edgecolor='black')
-    ax1.set_yscale('log')
-
-    center = (borders[:-1] + borders[1:]) / 2
-
-    for i, height in enumerate(height):
-        if height < 10:
-            ax1.plot(center[i], height, marker='o', color='r', markersize=3)
-
-    plt.xlabel("Частоты сдвигов")
-    ax1.grid(which='major', linestyle='-', linewidth='0.5', color='black')
-    ax1.grid(which='minor', linestyle=':', linewidth='0.5', color='black')
-    # Добавляем сетку для лучшей читаемости
-    ax2.grid(which='minor', linestyle=':', linewidth='0.5', color='black')
-    ax2.grid(which='major', linestyle='-', linewidth='0.5', color='black')
-
-    plt.tight_layout()  # Улучшаем размещение элементов графика
-    plt.show()
-
+    print(dot_array)
+    bin_stat_show(bin_stat_func(dot_array[0], dot_array[1], resolution=10, max_bin=100))
 
 if __name__ == '__main__':
     main()

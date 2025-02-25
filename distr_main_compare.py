@@ -1,8 +1,9 @@
+import multiprocessing as mp
+
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
-import multiprocessing as mp
 
 import distr_dens
 import distr_dens as dens
@@ -118,9 +119,7 @@ def main():
         vis.kdeVis(data=visDens, rawdata=visRawData, kdeType='ISJ', show_input=True, color='k', subplot=axes[i])
         vis.visual_additional(limmin=roiForAll[0], limmax=roiForAll[1], subplot=axes[i])
 
-
     vis.show()
-
 
 if __name__ == '__main__':
     main()
