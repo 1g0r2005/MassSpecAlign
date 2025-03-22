@@ -3,7 +3,7 @@ import os
 import sys
 import tkinter as tk
 from pathlib import Path
-
+import multiprocessing as mp
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
@@ -301,21 +301,21 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, limit=None):
 '''processes functions'''
 
 
-def front_main():
-    pass
-
-
-def back_main():
-    pass
-
+def front_main(q):
+    root = Root()
+    root.mainloop()
 
 '''program main function'''
 def main():
-    root = Root()
+    q = mp.Queue()
+    front_process = mp.Process(target=front_main,args=(q,))
+    front_process.start()
+    front_process.join()
+
     features_raw = File(FILE_NAMES[0], FOLDERS).read(DATASET)
     features_aln = File(FILE_NAMES[1], FOLDERS).read(DATASET)
     read_dataset(features_raw, features_aln, limit=100)
-    root.mainloop()
+
 
 
 if __name__ == '__main__':
