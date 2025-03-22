@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def visual_additional(limmin=0,limmax=0, subplot = plt):
-    print(type(subplot),subplot)
+    #print(type(subplot),subplot)
     nameplot = input('Enter name for plot:')
     xlabel,ylabel = [axis.strip() for axis in input('Enter name for each axis (x:,y:):').split(',')]
     subplot.set_title(nameplot)
@@ -25,10 +25,26 @@ def visual_scatter(*data,refs = [] ,subplot = plt):
 
 def kdeVis(rawdata,data,kdeType,show_input,color='k',subplot = plt):
     '''kde visualisation'''
-    if show_input:
-        subplot.plot(rawdata,np.zeros(rawdata.shape),'b+',ms=10)
+
+    #if show_input:
+    #    subplot.plot(rawdata,np.zeros(rawdata.shape),'b+',ms=10)
     #print(data)
     subplot.plot(data[0],data[1],color,label=f'KDE({kdeType})')
+
+def dbscanVis(data,labels,uniq,subplot = plt):
+    colors = plt.cm.Spectral(np.linspace(0,1,len(uniq)))
+    for k,col in zip(uniq,colors):
+        if k ==-1:
+            col = 'k'
+            marker = 'x'
+        else:
+            marker = 'o'
+
+        class_member_mask = (labels == k)
+        subplot.scatter(data[class_member_mask],np.zeros_like(data[class_member_mask]),c=[col],marker=marker,label=f'cl {k}' if k!=-1 else "noise")
+
+def histogramm(data,bins,alpha=1,subplot=plt):
+    subplot.hist(data,bins=bins,alpha=alpha)
 
 def show():
     plt.show()
