@@ -1,27 +1,21 @@
+import logging
 import os
+import sys
+import tkinter as tk
 from pathlib import Path
 
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+import yaml
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from numba import jit
-from scipy import stats
 from tqdm import tqdm
 
-FILENAMES = ('E031_032_033_5mg_60C_90sec_9AA_161023_rawdata.hdf5',
-             'E031_032_033_5mg_60C_90sec_9AA_161023.hdf5')
-FOLDERS = 'HDF\\Data\\'
-
-CASH = 'Cash\\cash.hdf5'
-
-DATASET = 'roi2_e033/00/features'
-
-REF = 194.0804748353425
-
-DEV = 0.2  # M/Z
+'''classes declaration'''
 
 
-class Dataset(np.ndarray):
+class LinkedList(np.ndarray):
     def __new__(cls, input_array, linked_array=None):
         obj = np.asarray(input_array).view(cls)
         obj.linked_array = linked_array
@@ -45,44 +39,135 @@ class Dataset(np.ndarray):
         self.linked_array[:] = sorted_linked
 
 
+class Dataset(LinkedList):
+    def __new__(cls, input_array, linked_array=None, reference=None):
+        obj = super().__new__(cls, input_array, linked_array)
+        obj.reference = reference
+        return obj
+
+    def __array_finalize__(self, obj):
+        super().__array_finalize__(obj)
+        if obj is None: return
+        self.reference = getattr(obj, 'reference', None)
+
+    def __setitem__(self, index, value):
+        super().__setitem__(index, value)
+
 class File:
-    def __init__(self, fileName, folder):
-        self.realpath = Path(os.path.join('..', folder, fileName))
+    def __init__(self, file_name, folder):
+        self.real_path = Path(os.path.join('..', folder, file_name))
 
     def exist(self):
-        return self.realpath.exists()
+        return self.real_path.exists()
 
     def read(self, dataset):
         try:
-            with h5py.File(self.realpath, 'r') as f:
+            with h5py.File(self.real_path, 'r') as f:
                 if dataset in f:
                     data = f[dataset][:]
                     return data
         except FileNotFoundError:
-            print(f"File {self.realpath} not found")
+            logging.error(f'File {self.real_path} not found')
             return None
-        except Exception as e:
-            print(f'Reading Error {e}')
+        except Exception as err:
+            logging.error(f'Reading Error: {err}')
             return None
 
+
+class Root(tk.Tk):
+    def __init__(self):
+        super(Root, self).__init__()
+        self.title("MZ alignment estimation")
+        self.geometry("800x600")
+        self.resizable(width=False, height=False)
+
+
+class TkPlot:
+    def __init__(self, root, x, y, x_label="x", y_label='y'):
+        self.root = root
+
+        self.fig, self.ax = plt.subplots()
+        self.ax.set(xlabel=x_label, ylabel=y_label)
+
+        self.x, self.y = x, y
+        self.line_plot = self.ax.plot(self.x, self.y)
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=root)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+    def update(self, x=None, y=None):
+        self.x, self.y = x, y
+        self.line_plot.relim()
+        self.line_plot.autoscale_view()
+        self.canvas.draw()
+
+
+'''decorators declaration'''
+
+
+def func_logger(full=False):
+    def actual_decorator(func):
+        def inner(*args, **kwargs):
+            ret = func(*args, **kwargs)
+            logger.info(f'Function {func.__name__}' + (f'with {args, kwargs} was called' if full else ''))
+            return ret
+
+        return inner
+
+    return actual_decorator
+
+
+def method_logger(method):
+    def inner(self, *args, **kwargs):
+        ret = method(*args, **kwargs)
+        logger.info(f'Method {method.__name__} of {self} was called')
+        return ret
+
+    return inner
+
+
+'''functions declaration'''
+
+
+def setup_logger():
+    real_logger = logging.getLogger()
+    real_logger.setLevel(logging.DEBUG)
+
+    log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    file_handler = logging.FileHandler(f'{__name__}.log', "w")
+    file_handler.setFormatter(log_formatter)
+    file_handler.setLevel(logging.INFO)
+
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(log_formatter)
+    stream_handler.setLevel(logging.ERROR)
+
+    real_logger.addHandler(file_handler)
+    real_logger.addHandler(stream_handler)
+
+    return real_logger
 
 @jit(nopython=True)
-def get_long_and_short(raw: np.ndarray, aln: np.ndarray):
+def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray):
     """
-    input - 1 - raw, 2 - aligned, flag_raw - which (raw, aligned) is bigger (true if raw)
-    return tuple of two arrays: 1 - long, 2 - short (1 and 2 have different sizes)
+    input - arr_1, arr_2 - two np.ndarray, possibly not equal size
+    return - tuple with two arrays (long, short)
+
+    warning: using JIT compilation for acceleration
     """
-    size1, size2 = raw.shape[0], aln.shape[0]
+    size1, size2 = arr_1.shape[0], arr_2.shape[0]
     if size1 > size2:
-        return raw, aln, True
+        return arr_1, arr_2, True
     else:
-        return aln, raw, False
+        return arr_2, arr_1, False
 
 
-# @jit(nopython=True)
-def opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool):
+def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool):
     """
-    return two arrays of equal size (1 - raw, 2 - aligned)
+    input - arr_long - bigger Dataset, arr_short - smaller Dataset with mz and int data
+    return - tuple with two arrays of equal size (optional slice for bigger dataset)
     """
     size = arr_short.shape[0]
     long_size = arr_long.shape[0]
@@ -104,89 +189,52 @@ def opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool):
         return arr_short, opt_long
 
 
-def indexes(dataset: np.ndarray, dsID: int):
+def get_index(dataset: np.ndarray, ds_id: int):
     """
-    return columns for spec with special ID
+    input - dataset - np.ndarray with full recorded data from attached HDF file
+          - ds_id - int with id of dataset column
+    return - np.ndarray with indexes of columns with requested id
     """
-    indexData = dataset[0]
-    return np.where(indexData == dsID)
+    index_data = dataset[0]
+    return np.where(index_data == ds_id)
 
 
-def checkData(data1: Dataset, data2: Dataset, threshold=1):
-    if data1.size != data2.size:
-        data1_new, data2_new = opt_strip(*get_long_and_short(data1, data2))
+@func_logger()
+def verify_datasets(data_1: Dataset, data_2: Dataset, threshold=1.0):
+    """
+    input - data_1, data_2 - Dataset objects which need to be verified
+          - threshold - int with maximum distance between values in data_1 and data_2 with one index
+    return - two fitted Dataset objects which match threshold value
+    """
+    if data_1.size != data_2.size:
+        data1_new, data2_new = get_opt_strip(*get_long_and_short(data_1, data_2))
     else:
-        data1_new = data1
-        data2_new = data2
-    distArray = data1_new - data2_new
-    scoreFit = np.max(np.abs(distArray))
+        data1_new = data_1
+        data2_new = data_2
 
-    if scoreFit > 1:
-        cut_index = np.array([np.where(np.abs(distArray) >= threshold)]).min()
-        # print(f'cut_index = {cut_index}')
+    dist_array = data1_new - data2_new
+    score_fit = np.max(np.abs(dist_array))
+
+    if score_fit > threshold:
+        cut_index = np.array([np.where(np.abs(dist_array) >= threshold)]).min()
         if data1_new[cut_index] < data2_new[cut_index]:
             data1_new2 = np.delete(data1_new, cut_index)
             data2_new2 = data2_new
         else:
             data2_new2 = np.delete(data2_new, cut_index)
             data1_new2 = data1_new
-        return opt_strip(*get_long_and_short(data1_new2, data2_new2))
+        return get_opt_strip(*get_long_and_short(data1_new2, data2_new2))
     return data1_new, data2_new
 
 
-def readDataset(datasetRaw: np.ndarray, datasetAln: np.ndarray, limit=None, ax=plt):
+@func_logger()
+def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0):
     """
-    read datasets and check data
+    input - dataset - Dataset object
+          - approx_mz - float with initial guess for ref peak location
+          - deviation - float with acceptable deviation from approx_mz value
+    return - tuple (index of reference peak in current dataset, m/z value)
     """
-
-    if limit is None:
-        setNum = int(max(datasetRaw[0])) + 1
-    else:
-        setNum = int(limit)
-
-    refList = []
-
-    for index in tqdm(range(setNum)):
-        indexRaw, indexAln = indexes(datasetRaw, index), indexes(datasetAln, index)
-
-        dataRawUnsorted = datasetRaw[1:3, indexRaw[0][0]:indexRaw[0][-1] + 1]
-        dataAlnUnsorted = datasetAln[1:3, indexAln[0][0]:indexAln[0][-1] + 1]
-
-        dataRaw = dataRawUnsorted[:, np.argsort(dataRawUnsorted, axis=1)[0]]
-        dataAln = dataAlnUnsorted[:, np.argsort(dataAlnUnsorted, axis=1)[0]]
-
-        dataRawMZ, dataAlnMZ = dataRaw[0], dataAln[0]
-        dataRawInt, dataAlnInt = dataRaw[1], dataAln[1]
-
-        dataRawLinked = Dataset(dataRawMZ, dataRawInt)
-        dataAlnLinked = Dataset(dataAlnMZ, dataAlnInt)
-
-        checkedRaw, checkedAln = checkData(dataRawLinked, dataAlnLinked, 1)
-
-        _, ref_mz_raw = findRef(checkedRaw, REF, DEV)
-        _, ref_aln_raw = findRef(checkedAln, REF, DEV)
-
-        refList.append(ref_mz_raw)
-        refList.append(ref_aln_raw)
-
-        '''
-        if index <2:
-            findRef(checkedRaw,REF,DEV)
-            y = checkedRaw-checkedAln
-            x = np.arange(len(y))
-            ax.scatter(x,y)
-        else:
-            return
-        '''
-    kde = stats.gaussian_kde(refList)
-    x_vals = np.linspace(min(refList), max(refList), 1000)
-    y_vals = kde.evaluate(x_vals)
-
-    ax.plot(x_vals, y_vals)
-
-
-def findRef(dataset: Dataset, approx_mz: float, deviation=1.0):
-    """find ref peak in ds and return index of peak"""
     condition_1 = approx_mz - deviation <= dataset
     condition_2 = approx_mz + deviation >= dataset
 
@@ -196,20 +244,97 @@ def findRef(dataset: Dataset, approx_mz: float, deviation=1.0):
     else:
         ref_index = np.argmin(np.abs(dataset - approx_mz))
 
-    # print(f"ref_index = {ref_index},intens = {dataset.linked_array[ref_index]}, mz = {dataset[ref_index]}")
     return ref_index, dataset[ref_index]
 
 
+@func_logger(full=False)
+def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, limit=None):
+    """
+    initial data verifying and recording into Dataset objects
+    input - dataset_raw, dataset_aln - np.ndarray arrays with full recorded data,
+          - limit - maximum number of mass spectra to be processed (for debugging use only, otherwise should be zero)
+    return - (void function)
+    """
+    if limit is None:
+        set_num = int(max(dataset_raw[0])) + 1
+    else:
+        set_num = int(limit)
+
+    ref_list = []
+
+    for index in tqdm(range(set_num)):
+        index_raw, index_aln = get_index(dataset_raw, index), get_index(dataset_aln, index)
+
+        data_raw_unsorted = dataset_raw[1:3, index_raw[0][0]:index_raw[0][-1] + 1]
+        data_aln_unsorted = dataset_aln[1:3, index_aln[0][0]:index_aln[0][-1] + 1]
+
+        data_raw = data_raw_unsorted[:, np.argsort(data_raw_unsorted, axis=1)[0]]
+        data_aln = data_aln_unsorted[:, np.argsort(data_aln_unsorted, axis=1)[0]]
+
+        data_raw_mz, data_aln_mz = data_raw[0], data_aln[0]
+        data_raw_int, data_aln_int = data_raw[1], data_aln[1]
+
+        data_raw_linked = Dataset(data_raw_mz, data_raw_int)
+        data_aln_linked = Dataset(data_aln_mz, data_aln_int)
+
+        checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
+
+        _, ref_aln = find_ref(checked_aln, REF, DEV)
+        _, ref_raw = find_ref(checked_raw, REF, DEV)
+
+        checked_raw.reference = ref_aln
+        checked_aln.reference = ref_raw
+
+        ref_list.append(ref_aln)
+
+    """
+    kde = stats.gaussian_kde(ref_list)
+
+    x_vals = np.linspace(min(ref_list), max(ref_list), 1000)
+    y_vals = kde.evaluate(x_vals)
+
+    ax.plot(x_vals, y_vals)
+    ax.scatter(ref_list, np.zeros(len(ref_list)),marker='x', color='black')
+    """
+
+
+'''processes functions'''
+
+
+def front_main():
+    pass
+
+
+def back_main():
+    pass
+
+
+'''program main function'''
 def main():
-    featuresRaw = File(FILENAMES[0], FOLDERS).read(DATASET)
-    featuresAln = File(FILENAMES[1], FOLDERS).read(DATASET)
-
-    fig, ax = plt.subplots()
-
-    readDataset(featuresRaw, featuresAln, ax=ax)
-
-    fig.show()
+    root = Root()
+    features_raw = File(FILE_NAMES[0], FOLDERS).read(DATASET)
+    features_aln = File(FILE_NAMES[1], FOLDERS).read(DATASET)
+    read_dataset(features_raw, features_aln, limit=100)
+    root.mainloop()
 
 
 if __name__ == '__main__':
-    main()
+    logger = setup_logger()
+    try:
+        with open("config.yaml", 'r') as yml_file:
+            yaml_config = yaml.load(yml_file, Loader=yaml.FullLoader)
+            FILE_NAMES, FOLDERS, CASH, DATASET, REF, DEV = (yaml_config["FILE_NAMES"],
+                                                            yaml_config["FOLDERS"],
+                                                            yaml_config["CASH"],
+                                                            yaml_config["DATASET"],
+                                                            yaml_config["REF"],
+                                                            yaml_config["DEV"])
+            logger.info("Configuration loaded")
+
+    except FileNotFoundError:
+        logger.error('File "config.yaml" not found')
+    try:
+        main()
+    except Exception as fatal:
+        logger.fatal(f'Fatal error: {fatal}. Program terminated.', exc_info=True)
+        quit()
