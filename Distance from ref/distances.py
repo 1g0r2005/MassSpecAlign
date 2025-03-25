@@ -1,6 +1,8 @@
 import logging
+import multiprocessing as mul
 import os
 import sys
+from multiprocessing import Process
 from pathlib import Path
 
 import h5py
@@ -9,11 +11,21 @@ import pyqtgraph as pg
 import scipy.stats as stats
 import yaml
 from PyQt5 import QtWidgets
+from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QVBoxLayout
 from numba import jit
 from tqdm import tqdm
 
 '''classes declaration'''
+
+
+class Const:
+    FILE_NAMES = None
+    FOLDERS = None
+    CASH = None
+    DATASET = None
+    REF = None
+    DEV = None
 
 class LinkedList(np.ndarray):
     def __new__(cls, input_array, linked_array=None):
@@ -85,19 +97,66 @@ class MainWindow(QMainWindow):
         self.tabs.setMovable(True)
         self.setCentralWidget(self.tabs)
         self.tabs.currentChanged.connect(self.adjust_tab_sizes)
+        self.const = Const
 
+        self.graph = GraphPage('REF')
+        self.tabs.addTab(self.graph, self.graph.title)
     def add_page(self, page: QWidget, page_title: str):
         self.tabs.addTab(page, page_title)
 
+
     def adjust_tab_sizes(self):
+        """resize core widget"""
         tab_size = self.tabs.size()
         for i in range(self.tabs.count()):
             tab = self.tabs.widget(i)
             tab.resize(tab_size)
 
     def resizeEvent(self, event):
+        """resize core widget - event catch"""
         super().resizeEvent(event)
         self.adjust_tab_sizes()
+
+    def setup_calc(self, graph):
+        """setup main calculation function separate from gui"""
+
+        self.parent_conn, self.child_conn = mul.Pipe()
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_pipe)
+        self.process = None
+
+    def start_calc(self):
+        if self.process and self.process.is_alive():
+            pass  # already started
+        self.process = Process(target=calc_process, args=(self.child_conn,
+                                                          self.const.FILE_NAMES,
+                                                          self.const.FOLDERS,
+                                                          self.const.DATASET,
+                                                          self.const.REF,
+                                                          self.const.DEV))
+        self.process.start()
+        self.timer.start(100)
+
+    def stop_calc(self):
+        if self.process and self.process.is_alive():
+            self.parent_conn.send(('command', 'stop'))
+            self.process.join()
+        self.timer.stop()
+        self.parent_conn.close()
+
+    def check_pipe(self):
+        while self.parent_conn.poll():
+            try:
+                msg_type, msg = self.parent_conn.recv()
+                if msg_type == 'data':
+                    self.graph.update(msg[0], msg[1])
+                    QApplication.processEvents()
+                elif msg_type == 'update':
+                    print(f'status : {msg}')
+                # self.signals.data.emit(msg)
+            except Exception as err:
+                print(err)
+                self.timer.stop()
 
 
 class GraphPage(QWidget):
@@ -122,18 +181,14 @@ class GraphPage(QWidget):
             self.y = []
 
         pen = pg.mkPen(color=color)
-        self.Plot.plot(self.x, self.y, pen=pen)
+        self.data_line = self.Plot.plot(self.x, self.y, pen=pen)
 
-    def update(self, x=None, y=None, x_label='x', y_label='y', ):
-        self.Plot.setLabel('bottom', x_label)
-        self.Plot.setLabel('left', y_label)
-
+    def update(self, x=None, y=None):
         self.x = x
         self.y = y
-
         self.data_line.setData(self.x, self.y)
 
-
+        print('update!', self.x, self.y)
 '''decorators declaration'''
 
 
@@ -284,7 +339,7 @@ def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0):
     return ref_index, dataset[ref_index]
 
 
-def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, limit=None):
+def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, limit=None):
     """
     initial data verifying and recording into Dataset objects
     input - dataset_raw, dataset_aln - np.ndarray arrays with full recorded data,
@@ -329,35 +384,38 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, limit=None):
 
 '''process main function'''
 
+
+def calc_process(conn, FILE_NAMES, FOLDERS, DATASET, REF, DEV):
+    try:
+        features_raw = File(FILE_NAMES[0], FOLDERS).read(DATASET)
+        features_aln = File(FILE_NAMES[1], FOLDERS).read(DATASET)
+        dataset_list = read_dataset(features_raw, features_aln, REF, DEV, limit=200)
+        raw_ref_list = np.array([ds.reference for ds in dataset_list[:, 0]])
+        aln_ref_list = np.array([ds.reference for ds in dataset_list[:, 1]])
+        x1, y1 = kde_process(aln_ref_list)
+        conn.send(('data', (x1, y1)))
+    finally:
+        conn.send(('status', 'end'))
+        conn.close()
+
 '''program main function'''
 def main():
-    features_raw = File(FILE_NAMES[0], FOLDERS).read(DATASET)
-    features_aln = File(FILE_NAMES[1], FOLDERS).read(DATASET)
-
-    dataset_list = read_dataset(features_raw, features_aln, limit=100)
-    print(f'type of dataset: {type(dataset_list)}')
-    raw_ref_list = np.array([ds.reference for ds in dataset_list[:, 0]])
-    aln_ref_list = np.array([ds.reference for ds in dataset_list[:, 1]])
-
-    x1, y1 = kde_process(raw_ref_list)
-    x2, y2 = kde_process(aln_ref_list)
-
     app = QApplication(sys.argv)
     main_window = MainWindow()
 
-    graph = GraphPage('graph', x2, y2)
-
-    main_window.add_page(graph, graph.title)
-
+    main_window.setup_calc(main_window.graph)
+    main_window.start_calc()
     main_window.show()
-    app.exec()
+
+    sys.exit(app.exec_())
 
 if __name__ == '__main__':
     logger = setup_logger()
     try:
         with open("config.yaml", 'r') as yml_file:
             yaml_config = yaml.load(yml_file, Loader=yaml.FullLoader)
-            FILE_NAMES, FOLDERS, CASH, DATASET, REF, DEV = (yaml_config["FILE_NAMES"],
+            c = Const
+            c.FILE_NAMES, c.FOLDERS, c.CASH, c.DATASET, c.REF, c.DEV = (yaml_config["FILE_NAMES"],
                                                             yaml_config["FOLDERS"],
                                                             yaml_config["CASH"],
                                                             yaml_config["DATASET"],
