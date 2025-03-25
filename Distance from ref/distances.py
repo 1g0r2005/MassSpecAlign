@@ -1,16 +1,15 @@
 import logging
 import os
 import sys
-import tkinter as tk
 from pathlib import Path
-from tkinter import ttk
 
 import h5py
-import matplotlib.pyplot as plt
 import numpy as np
+import pyqtgraph as pg
 import scipy.stats as stats
 import yaml
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QVBoxLayout
 from numba import jit
 from tqdm import tqdm
 
@@ -76,62 +75,63 @@ class File:
             return None
 
 
-class App(tk.Tk):
-    def __init__(self):
+class MainWindow(QMainWindow):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setWindowTitle('MZ alignment quality evaluation')
+        self.resize(800, 600)
+        self.tabs = QtWidgets.QTabWidget(self)
+        self.tabs.setTabPosition(QtWidgets.QTabWidget.North)
+        self.tabs.setMovable(True)
+        self.setCentralWidget(self.tabs)
+        self.tabs.currentChanged.connect(self.adjust_tab_sizes)
+
+    def add_page(self, page: QWidget, page_title: str):
+        self.tabs.addTab(page, page_title)
+
+    def adjust_tab_sizes(self):
+        tab_size = self.tabs.size()
+        for i in range(self.tabs.count()):
+            tab = self.tabs.widget(i)
+            tab.resize(tab_size)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.adjust_tab_sizes()
+
+
+class GraphPage(QWidget):
+
+    def __init__(self, title, x=None, y=None, x_label='x', y_label='y', color=(255, 255, 255), bg_color=(0, 0, 0)):
         super().__init__()
-        self.title('MZ alignment quality evaluation')
-        self.geometry('800x600')
+        self.layout = QVBoxLayout()
+        self.title = title
+        self.Plot = pg.PlotWidget()
+        self.layout.addWidget(self.Plot)
+        self.setLayout(self.layout)
 
-        self.base = ttk.Notebook(self)
-        self.base.pack(fill='both', expand=True)
+        self.Plot.setLabel('bottom', x_label)
+        self.Plot.setLabel('left', y_label)
 
-    def add_page(self, page: tk.Frame, page_title):
-        self.base.add(page, text=page_title)
-
-
-class TkPlot:
-    """Pyplot dynamic plot wrapped into tkinter canvas object"""
-
-    def __init__(self, root, x=None, y=None, x_label="x", y_label='y'):
-        self.root = root
-        self.fig, self.ax = plt.subplots()
-
-        self.ax.set(xlabel=x_label, ylabel=y_label)
-
-        if x is None or y is None:
-            self.x, self.y = np.array([]), np.array([])
+        self.Plot.setBackground(bg_color)
+        if x is not None and y is not None:
+            self.x = x
+            self.y = y
         else:
-            self.x, self.y = x, y
+            self.x = []
+            self.y = []
 
-        self.line_plot, = self.ax.plot(self.x, self.y, markersize=8)
+        pen = pg.mkPen(color=color)
+        self.Plot.plot(self.x, self.y, pen=pen)
 
-        self.canvas = FigureCanvasTkAgg(self.fig, master=root)
-        self.canvas.draw()
-        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+    def update(self, x=None, y=None, x_label='x', y_label='y', ):
+        self.Plot.setLabel('bottom', x_label)
+        self.Plot.setLabel('left', y_label)
 
-        self.warning_label = tk.Label(self.root, text='No data found')
-        self.warning_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        self.x = x
+        self.y = y
 
-        if self.x.size > 0 or self.y.size > 0:
-            self.warning_label.place_forget()
-
-    def update(self, x=None, y=None):
-        self.x, self.y = x, y
-        if x is None or y is None:
-            self.x, self.y = np.array([]), np.array([])
-        else:
-            self.x, self.y = x, y
-
-        self.line_plot.set_ydata(self.y)
-        self.line_plot.set_xdata(self.x)
-        self.ax.relim()
-        self.ax.autoscale_view()
-        self.canvas.draw()
-
-        if self.x.size > 0 or self.y.size > 0:
-            self.warning_label.place_forget()
-        else:
-            self.warning_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        self.data_line.setData(self.x, self.y)
 
 
 '''decorators declaration'''
@@ -166,7 +166,6 @@ def kde_process(dataset, num_dots=1000):
 
     x_vals = np.linspace(min(dataset), max(dataset), num_dots)
     y_vals = kde.evaluate(x_vals)
-
     return x_vals, y_vals
 
 
@@ -328,41 +327,30 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, limit=None):
     return dataset_list
 
 
+'''process main function'''
+
 '''program main function'''
 def main():
-    root = App()
     features_raw = File(FILE_NAMES[0], FOLDERS).read(DATASET)
     features_aln = File(FILE_NAMES[1], FOLDERS).read(DATASET)
 
-    dataset_list = read_dataset(features_raw, features_aln)
+    dataset_list = read_dataset(features_raw, features_aln, limit=100)
+    print(f'type of dataset: {type(dataset_list)}')
     raw_ref_list = np.array([ds.reference for ds in dataset_list[:, 0]])
     aln_ref_list = np.array([ds.reference for ds in dataset_list[:, 1]])
-    '''
-    x1,y1 = raw_ref_list,np.full(raw_ref_list.shape,1)
-    x2,y2 = aln_ref_list,np.full(aln_ref_list.shape,2)
-    '''
+
     x1, y1 = kde_process(raw_ref_list)
     x2, y2 = kde_process(aln_ref_list)
 
-    plot_data = {'Raw refs': (x1, y1), 'Aln refs': (x2, y2)}
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
 
-    def on_plot_select(event=None):
-        selection = plot_combobox.get()
-        x, y = plot_data[selection]
-        print(selection)
-        plot.update(x, y)
+    graph = GraphPage('graph', x2, y2)
 
-    graph_page = ttk.Frame(root)
-    root.add_page(graph_page, 'graph')
-    plot = TkPlot(graph_page)
+    main_window.add_page(graph, graph.title)
 
-    plot_combobox = ttk.Combobox(graph_page, values=list(plot_data.keys()))
-    plot_combobox.pack(side=tk.TOP)
-    plot_combobox.set('Raw refs')
-    plot_combobox.bind('<<ComboboxSelected>>', on_plot_select)
-
-    on_plot_select()
-    root.mainloop()
+    main_window.show()
+    app.exec()
 
 if __name__ == '__main__':
     logger = setup_logger()
