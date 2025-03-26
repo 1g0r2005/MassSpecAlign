@@ -1,9 +1,14 @@
+/*
+!.gitignore
+!Distance from ref/
+
 # Data folders (too heavy)
 HDF/
 
 # Demos
 
 Demos/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

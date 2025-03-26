@@ -18,7 +18,6 @@ from tqdm import tqdm
 
 '''classes declaration'''
 
-
 class Const:
     FILE_NAMES = None
     FOLDERS = None
