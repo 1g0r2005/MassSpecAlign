@@ -222,7 +222,6 @@ def kde_process(dataset, num_dots=1000):
     y_vals = kde.evaluate(x_vals)
     return x_vals, y_vals
 
-
 def setup_logger():
     real_logger = logging.getLogger()
     real_logger.setLevel(logging.DEBUG)
