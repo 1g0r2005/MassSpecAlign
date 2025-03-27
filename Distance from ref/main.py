@@ -25,8 +25,8 @@ def func_logger(add_info='', full=False):
         def inner(*args, **kwargs):
             logger = logging.getLogger('main')
             ret = func(*args, **kwargs)
-            logger.info(f'Function {func.__name__}' + (f'with {args, kwargs} was called' if full else '') + (
-                f'({add_info})' if add_info else ''))
+            logger.info(f'Function {func.__name__}' + (f' with {args, kwargs} was called' if full else '') + (
+                f' ({add_info})' if add_info else ''))
             return ret
 
         return inner
@@ -132,7 +132,7 @@ class LogWidget(QtWidgets.QTextEdit):
         super().__init__(parent)
         self.handler = handler
         self.handler.message.connect(self.__updateText)
-
+        self.setReadOnly(True)
     def __scrollDown(self):
         scroll = self.verticalScrollBar()
         end_text = scroll.maximum()
