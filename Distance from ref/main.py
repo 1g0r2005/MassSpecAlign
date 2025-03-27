@@ -1,6 +1,5 @@
 import logging
 import multiprocessing as mul
-import os
 import sys
 from multiprocessing import Process
 from pathlib import Path
@@ -10,17 +9,37 @@ import numpy as np
 import pyqtgraph as pg
 import scipy.stats as stats
 import yaml
+from IPython.external.qt_for_kernel import QtCore
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QVBoxLayout
+from PyQt5.QtCore import QTimer, QObject, pyqtSignal
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QVBoxLayout, QLineEdit, QLabel, QPushButton, \
+    QFormLayout, QFileDialog
 from numba import jit
 from tqdm import tqdm
 
-'''classes declaration'''
+'''decorators declaration'''
+
+
+def func_logger(add_info='', full=False):
+    def actual_decorator(func):
+        def inner(*args, **kwargs):
+            logger = logging.getLogger('main')
+            ret = func(*args, **kwargs)
+            logger.info(f'Function {func.__name__}' + (f'with {args, kwargs} was called' if full else '') + (
+                f'({add_info})' if add_info else ''))
+            return ret
+
+        return inner
+
+    return actual_decorator
+
+
+"""classes declaration"""
 
 class Const:
-    FILE_NAMES = None
-    FOLDERS = None
+    """Class for handling constants """
+    RAW = None
+    ALN = None
     CASH = None
     DATASET = None
     REF = None
@@ -49,7 +68,6 @@ class LinkedList(np.ndarray):
         self[:] = sorted_self
         self.linked_array[:] = sorted_linked
 
-
 class Dataset(LinkedList):
     def __new__(cls, input_array, linked_array=None, reference=None):
         obj = super().__new__(cls, input_array, linked_array)
@@ -64,10 +82,9 @@ class Dataset(LinkedList):
     def __setitem__(self, index, value):
         super().__setitem__(index, value)
 
-
 class File:
-    def __init__(self, file_name, folder):
-        self.real_path = Path(os.path.join('..', folder, file_name))
+    def __init__(self, file_name):
+        self.real_path = Path(file_name)
 
     def exist(self):
         return self.real_path.exists()
@@ -86,6 +103,45 @@ class File:
             return None
 
 
+class SpecialHandler(logging.StreamHandler, QObject):
+    message = pyqtSignal(str)
+
+    def __init__(self):
+        logging.StreamHandler.__init__(self)
+        QtCore.QObject.__init__(self)
+
+    def emit(self, record: str):
+        log_message = self.format(record)
+        if 'DEBUG' in log_message:
+            text = f"""<span style="color:#000000">{log_message}</span>"""
+        elif 'INFO' in log_message:
+            text = f"""<span style="color:#000000">{log_message}</span>"""
+        elif 'WARNING' in log_message:
+            text = f"""<span style="color:#cecc21">{log_message}</span>"""
+        elif 'ERROR' in log_message:
+            text = f"""<span style="color:#ff7e00">{log_message}</span>"""
+        elif 'CRITICAL' in log_message:
+            text = f"""<span style="color:#ff0000">{log_message}</span>"""
+        self.message.emit(text)
+        self.flush()
+
+
+class LogWidget(QtWidgets.QTextEdit):
+    def __init__(self, handler: logging.StreamHandler, parent=None):
+        QtWidgets.QTabWidget.__init__(self, parent)
+        super().__init__(parent)
+        self.handler = handler
+        self.handler.message.connect(self.__updateText)
+
+    def __scrollDown(self):
+        scroll = self.verticalScrollBar()
+        end_text = scroll.maximum()
+        scroll.setValue(end_text)
+
+    def __updateText(self, msg: str):
+        self.append(msg)
+        self.__scrollDown()
+
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -97,11 +153,11 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
         self.tabs.currentChanged.connect(self.adjust_tab_sizes)
         self.const = Const
-
-        self.graph = GraphPage('REF')
+        self.logger, self.special_handler = setup_logger()
+        self.main = MainPage(self, 'Main')
+        self.tabs.addTab(self.main, self.main.title)
+        self.graph = GraphPage(self, 'Graph')
         self.tabs.addTab(self.graph, self.graph.title)
-    def add_page(self, page: QWidget, page_title: str):
-        self.tabs.addTab(page, page_title)
 
 
     def adjust_tab_sizes(self):
@@ -116,7 +172,7 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self.adjust_tab_sizes()
 
-    def setup_calc(self, graph):
+    def setup_calc(self):
         """setup main calculation function separate from gui"""
 
         self.parent_conn, self.child_conn = mul.Pipe()
@@ -128,11 +184,12 @@ class MainWindow(QMainWindow):
         if self.process and self.process.is_alive():
             pass  # already started
         self.process = Process(target=calc_process, args=(self.child_conn,
-                                                          self.const.FILE_NAMES,
-                                                          self.const.FOLDERS,
+                                                          self.const.RAW,
+                                                          self.const.ALN,
                                                           self.const.DATASET,
                                                           self.const.REF,
-                                                          self.const.DEV))
+                                                          self.const.DEV
+                                                          ))
         self.process.start()
         self.timer.start(100)
 
@@ -150,17 +207,115 @@ class MainWindow(QMainWindow):
                 if msg_type == 'data':
                     self.graph.update(msg[0], msg[1])
                     QApplication.processEvents()
-                elif msg_type == 'update':
-                    print(f'status : {msg}')
-                # self.signals.data.emit(msg)
+                elif msg_type == 'Info':
+                    self.logger.info(msg)
+                elif msg_type == 'Error':
+                    self.logger.error(msg)
+
             except Exception as err:
                 print(err)
                 self.timer.stop()
 
 
-class GraphPage(QWidget):
+class MainPage(QWidget):
+    def __init__(self, parent, title):
+        super().__init__()
+        self.title = title
+        self.parent = parent
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.splitter = QtWidgets.QSplitter(self)
 
-    def __init__(self, title, x=None, y=None, x_label='x', y_label='y', color=(255, 255, 255), bg_color=(0, 0, 0)):
+        form_panel = QtWidgets.QWidget()
+        form_layout = QFormLayout()
+        form_panel.setLayout(form_layout)
+
+        config_panel = QtWidgets.QWidget()
+        config_layout = QtWidgets.QVBoxLayout()
+        config_panel.setLayout(config_layout)
+        self.logger, self.special_handler = parent.logger, parent.special_handler
+        self.setLayout(self.main_layout)
+
+        # Raw
+        self.raw_layout = QtWidgets.QHBoxLayout()
+        self.raw_filename = QLineEdit()
+        self.raw_open_button = QPushButton("Browse")
+        self.raw_open_button.clicked.connect(lambda: self.open_file(self.raw_filename))
+        self.raw_layout.addWidget(self.raw_filename)
+        self.raw_layout.addWidget(self.raw_open_button)
+        # aln
+        self.aln_layout = QtWidgets.QHBoxLayout()
+        self.aln_filename = QLineEdit()
+        self.aln_open_button = QPushButton("Browse")
+        self.aln_open_button.clicked.connect(lambda: self.open_file(self.aln_filename))
+        self.aln_layout.addWidget(self.aln_filename)
+        self.aln_layout.addWidget(self.aln_open_button)
+        # ref and dev
+        self.dataset = QLineEdit()
+        self.ref_set = QLineEdit()
+        self.dev_set = QLineEdit()
+        form_layout.addRow(QLabel("Raw data:"), self.raw_layout)
+        form_layout.addRow(QLabel("Alignment data:"), self.aln_layout)
+        form_layout.addRow(QLabel("Dataset:"), self.dataset)
+        form_layout.addRow(QLabel("Reference point:"), self.ref_set)
+        form_layout.addRow(QLabel("Acceptable deviation:"), self.dev_set)
+
+        self.config_button = QPushButton("Browse config")
+        self.config_button.clicked.connect(lambda: self.open_config())
+        self.load_config_button = QPushButton("Load")
+        self.load_config_button.clicked.connect(lambda: self.save_config())
+        self.calc_button = QPushButton("Calculate")
+        config_layout.addWidget(self.config_button)
+        config_layout.addWidget(self.load_config_button)
+        config_layout.addWidget(self.calc_button)
+        self.calc_button.clicked.connect(lambda: self.signal())
+        self.calc_button.setEnabled(False)
+        self.splitter.addWidget(form_panel)
+        self.splitter.addWidget(config_panel)
+        self.main_layout.addWidget(self.splitter)
+        self.main_layout.addWidget(LogWidget(self.special_handler))
+
+    @func_logger(full=True)
+    def open_file(self, raw_filename):
+        filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "HDF (*.hdf,*.h5,,'*.hdf5');;All Files (*)")
+        if not filename: return
+        raw_filename.setText(filename)
+
+    @func_logger(full=True)
+    def open_config(self):
+        filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "yaml (*.yaml);;All Files (*)")
+        if not filename: return
+        with open(filename, 'r', encoding='utf8') as f:
+            yaml_config = yaml.load(f, Loader=yaml.FullLoader)
+            self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
+            self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
+            self.ref_set.setText(str(yaml_config['REF']))
+            self.dev_set.setText(str(yaml_config['DEV']))
+            self.dataset.setText(str(yaml_config['DATASET']))
+
+    @func_logger(full=True)
+    def save_config(self):
+        try:
+            data = (self.raw_filename.text(),
+                    self.aln_filename.text(),
+                    self.ref_set.text(),
+                    self.dev_set.text(),
+                    self.dataset.text())
+            if '' in data:
+                raise Exception('Empty string')
+            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET = data[0], data[1], float(data[2]), float(
+                data[3]), data[4]
+            self.calc_button.setEnabled(True)
+        except Exception as e:
+            print(e)
+
+    @func_logger()
+    def signal(self):
+        self.parent.setup_calc()
+        self.parent.start_calc()
+
+class GraphPage(QWidget):
+    def __init__(self, parent, title='graph', x=None, y=None, x_label='x', y_label='y', color=(255, 255, 255),
+                 bg_color=(0, 0, 0)):
         super().__init__()
         self.layout = QVBoxLayout()
         self.title = title
@@ -182,49 +337,22 @@ class GraphPage(QWidget):
         pen = pg.mkPen(color=color)
         self.data_line = self.Plot.plot(self.x, self.y, pen=pen)
 
+    @func_logger(add_info='GRAPH PAGE UPDATE')
     def update(self, x=None, y=None):
         self.x = x
         self.y = y
         self.data_line.setData(self.x, self.y)
 
-        print('update!', self.x, self.y)
-'''decorators declaration'''
-
-
-def func_logger(full=False):
-    def actual_decorator(func):
-        def inner(*args, **kwargs):
-            ret = func(*args, **kwargs)
-            logger.info(f'Function {func.__name__}' + (f'with {args, kwargs} was called' if full else ''))
-            return ret
-
-        return inner
-
-    return actual_decorator
-
-
-def method_logger(method):
-    def inner(self, *args, **kwargs):
-        ret = method(*args, **kwargs)
-        logger.info(f'Method {method.__name__} of {self} was called')
-        return ret
-
-    return inner
-
-
 '''functions declaration'''
-
-
 def kde_process(dataset, num_dots=1000):
     kde = stats.gaussian_kde(dataset)
-
     x_vals = np.linspace(min(dataset), max(dataset), num_dots)
     y_vals = kde.evaluate(x_vals)
     return x_vals, y_vals
 
 def setup_logger():
-    real_logger = logging.getLogger()
-    real_logger.setLevel(logging.DEBUG)
+    logger = logging.getLogger('main')
+    logger.setLevel(logging.DEBUG)
 
     log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -232,14 +360,12 @@ def setup_logger():
     file_handler.setFormatter(log_formatter)
     file_handler.setLevel(logging.INFO)
 
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(log_formatter)
-    stream_handler.setLevel(logging.ERROR)
+    special_handler = SpecialHandler()
+    special_handler.setFormatter(log_formatter)
+    logger.addHandler(special_handler)
+    logger.addHandler(file_handler)
 
-    real_logger.addHandler(file_handler)
-    real_logger.addHandler(stream_handler)
-
-    return real_logger
+    return logger, special_handler
 
 @jit(nopython=True)
 def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray):
@@ -255,7 +381,6 @@ def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray):
     else:
         return arr_2, arr_1, False
 
-
 def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool):
     """
     input - arr_long - bigger Dataset, arr_short - smaller Dataset with mz and int data
@@ -269,17 +394,12 @@ def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool):
     for i in shift_array:
         fit_score = np.mean((arr_short - arr_long[i:i + size]) ** 2)
         score_array[i] = fit_score
-        # if key_show:
-        # print(f'{i}: arr1:{arr_short}, arr2:{arr_long[i:i+size]}, fit_score: {fit_score}')
     opt_shift = np.where(score_array == score_array.min())[0][0]
     opt_long = arr_long[opt_shift:opt_shift + size]
-
-    # print(type(opt_long),type(arr_short))
     if flag:
         return opt_long, arr_short
     else:
         return arr_short, opt_long
-
 
 def get_index(dataset: np.ndarray, ds_id: int):
     """
@@ -289,7 +409,6 @@ def get_index(dataset: np.ndarray, ds_id: int):
     """
     index_data = dataset[0]
     return np.where(index_data == ds_id)
-
 
 def verify_datasets(data_1: Dataset, data_2: Dataset, threshold=1.0):
     """
@@ -317,7 +436,6 @@ def verify_datasets(data_1: Dataset, data_2: Dataset, threshold=1.0):
         return get_opt_strip(*get_long_and_short(data1_new2, data2_new2))
     return data1_new, data2_new
 
-
 def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0):
     """
     input - dataset - Dataset object
@@ -335,7 +453,6 @@ def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0):
         ref_index = np.argmin(np.abs(dataset - approx_mz))
 
     return ref_index, dataset[ref_index]
-
 
 def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, limit=None):
     """
@@ -379,52 +496,27 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, lim
 
     return dataset_list
 
-
 '''process main function'''
 
 
-def calc_process(conn, FILE_NAMES, FOLDERS, DATASET, REF, DEV):
+def calc_process(conn, RAW, ALN, DATASET, REF, DEV):
+    conn.send(('Info', f'Process {calc_process.__name__} started'))
     try:
-        features_raw = File(FILE_NAMES[0], FOLDERS).read(DATASET)
-        features_aln = File(FILE_NAMES[1], FOLDERS).read(DATASET)
-        dataset_list = read_dataset(features_raw, features_aln, REF, DEV, limit=200)
+        features_raw = File(RAW).read(DATASET)
+        features_aln = File(ALN).read(DATASET)
+        dataset_list = read_dataset(features_raw, features_aln, REF, DEV)
         raw_ref_list = np.array([ds.reference for ds in dataset_list[:, 0]])
         aln_ref_list = np.array([ds.reference for ds in dataset_list[:, 1]])
         x1, y1 = kde_process(aln_ref_list)
         conn.send(('data', (x1, y1)))
+    except Exception as e:
+        conn.send('Error', e)
     finally:
-        conn.send(('status', 'end'))
+        conn.send(('Info', f'Process {calc_process.__name__} ended successfully'))
         conn.close()
 
-'''program main function'''
-def main():
+if __name__ == '__main__':
     app = QApplication(sys.argv)
     main_window = MainWindow()
-
-    main_window.setup_calc(main_window.graph)
-    main_window.start_calc()
     main_window.show()
-
     sys.exit(app.exec_())
-
-if __name__ == '__main__':
-    logger = setup_logger()
-    try:
-        with open("config.yaml", 'r') as yml_file:
-            yaml_config = yaml.load(yml_file, Loader=yaml.FullLoader)
-            c = Const
-            c.FILE_NAMES, c.FOLDERS, c.CASH, c.DATASET, c.REF, c.DEV = (yaml_config["FILE_NAMES"],
-                                                            yaml_config["FOLDERS"],
-                                                            yaml_config["CASH"],
-                                                            yaml_config["DATASET"],
-                                                            yaml_config["REF"],
-                                                            yaml_config["DEV"])
-            logger.info("Configuration loaded")
-
-    except FileNotFoundError:
-        logger.error('File "config.yaml" not found')
-    try:
-        main()
-    except Exception as fatal:
-        logger.fatal(f'Fatal error: {fatal}. Program terminated.', exc_info=True)
-        quit()
