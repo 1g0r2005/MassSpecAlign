@@ -1,20 +1,22 @@
 import logging
-import multiprocessing as mul
 import sys
-from multiprocessing import Process
+from functools import partial
+from multiprocessing import Process, Queue, shared_memory, Pool
 from pathlib import Path
+from queue import Empty
 
 import h5py
 import numpy as np
-import pyqtgraph as pg
-import scipy.stats as stats
 import yaml
-from IPython.external.qt_for_kernel import QtCore
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QVBoxLayout, QLineEdit, QLabel, QPushButton, \
     QFormLayout, QFileDialog
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_template import FigureCanvas
+from matplotlib.figure import Figure
 from numba import jit
+from sklearn.neighbors import KernelDensity
 from tqdm import tqdm
 
 '''decorators declaration'''
@@ -36,6 +38,7 @@ def func_logger(add_info='', full=False):
 
 """classes declaration"""
 
+
 class Const:
     """Class for handling constants """
     RAW = None
@@ -44,6 +47,128 @@ class Const:
     DATASET = None
     REF = None
     DEV = None
+
+
+class WorkerSignals(QObject):
+    output = pyqtSignal(str)
+    error = pyqtSignal(str)
+    result = pyqtSignal(object)
+
+
+class StreamRedirect:
+    def __init__(self, q):
+        self.q = q
+
+    def write(self, msg: str):
+        if msg.strip():
+            self.q.put(msg)
+
+    def flush(self):
+        pass
+
+
+class ProcessManager:
+    def __init__(self, signals):
+        self.signals = signals
+        self.output_q = Queue()
+        self.error_q = Queue()
+        self.return_q = Queue()
+
+        self.process_set = set()
+
+    def run_process(self, target, target_name, args=(), kwargs=None):
+        if kwargs is None:
+            kwargs = {}
+        p = Process(target=self._std_wrapper, args=(target, self.output_q, self.error_q, self.return_q, args, kwargs))
+        self.process_set.add(target_name)
+        p.start()
+        return p
+
+    def end_process(self, process, target_name):
+        if target_name in self.process_set:
+            try:
+                process.join()
+            except Exception as e:
+                self.error_q.put(e)
+        else:
+            self.error_q.put(str(Exception('no process with name {} running'.format(target_name))))
+
+    @staticmethod
+    def _std_wrapper(target, out_q, error_q, ret_q, args=(), kwargs=None):
+        if kwargs is None:
+            kwargs = {}
+        shm = None
+        try:
+            sys.stdout = StreamRedirect(out_q)
+            sys.stderr = StreamRedirect(error_q)
+
+            result = target(*args, **kwargs)
+
+            if isinstance(result, np.ndarray):
+                shm = shared_memory.SharedMemory(create=True, size=result.nbytes)
+                shm_arr = np.ndarray(result.shape, dtype=result.dtype, buffer=shm.buf)
+                np.copyto(shm_arr, result)
+                print('with shared memory')
+                print((target.__name__, 'sh_mem', (shm.name, result.shape, result.dtype)))
+                ret_q.put((target.__name__, 'sh_mem', (shm.name, result.shape, result.dtype)))
+            else:
+                ret_q.put((target.__name__, 'direct', result))
+                print((target.__name__, 'direct', result))
+        except Exception as e:
+            error_q.put(e)
+        finally:
+            sys.stdout.flush()
+            sys.stderr.flush()
+
+    def __check_return(self):
+        while not self.return_q.empty():
+            try:
+                func_name, msg_type, content = self.return_q.get_nowait()
+                # print('return from {}'.format(func_name))
+                if msg_type == 'direct':
+                    self.signals.result.emit(content)
+                elif msg_type == 'sh_mem':
+                    shm_name, shape, dtype = content
+                    self._process_shmem(shm_name, shape, dtype)
+            except Empty:
+                break
+            except Exception as e:
+                self.error_q.put(e)
+
+    def __check_error(self):
+        while not self.error_q.empty():
+            try:
+                msg = self.error_q.get_nowait()
+                # print(msg, end='')
+                self.signals.error.emit(str(msg))
+            except Empty:
+                break
+
+    def __check_out(self):
+        while not self.output_q.empty():
+            try:
+                msg = self.output_q.get_nowait()
+                # print(msg)
+                self.signals.output.emit(msg)
+            except Empty:
+                break
+
+    def check_queues(self):
+        self.__check_return()
+        self.__check_error()
+        self.__check_out()
+
+    def _process_shmem(self, shm_name, shape, dtype):
+        existing_shm = None
+        try:
+            existing_shm = shared_memory.SharedMemory(name=shm_name)
+            arr = np.ndarray(shape, dtype=dtype, buffer=existing_shm.buf).copy()
+            self.signals.result.emit(arr)
+        except Exception as e:
+            self.error_q.put(e)
+        finally:
+            existing_shm.close()
+            existing_shm.unlink()
 
 class LinkedList(np.ndarray):
     def __new__(cls, input_array, linked_array=None):
@@ -68,6 +193,7 @@ class LinkedList(np.ndarray):
         self[:] = sorted_self
         self.linked_array[:] = sorted_linked
 
+
 class Dataset(LinkedList):
     def __new__(cls, input_array, linked_array=None, reference=None):
         obj = super().__new__(cls, input_array, linked_array)
@@ -81,6 +207,7 @@ class Dataset(LinkedList):
 
     def __setitem__(self, index, value):
         super().__setitem__(index, value)
+
 
 class File:
     def __init__(self, file_name):
@@ -103,44 +230,23 @@ class File:
             return None
 
 
-class SpecialHandler(logging.StreamHandler, QObject):
-    message = pyqtSignal(str)
-
-    def __init__(self):
-        logging.StreamHandler.__init__(self)
-        QtCore.QObject.__init__(self)
-
-    def emit(self, record: str):
-        log_message = self.format(record)
-        if 'DEBUG' in log_message:
-            text = f"""<span style="color:#000000">{log_message}</span>"""
-        elif 'INFO' in log_message:
-            text = f"""<span style="color:#000000">{log_message}</span>"""
-        elif 'WARNING' in log_message:
-            text = f"""<span style="color:#cecc21">{log_message}</span>"""
-        elif 'ERROR' in log_message:
-            text = f"""<span style="color:#ff7e00">{log_message}</span>"""
-        elif 'CRITICAL' in log_message:
-            text = f"""<span style="color:#ff0000">{log_message}</span>"""
-        self.message.emit(text)
-        self.flush()
-
-
 class LogWidget(QtWidgets.QTextEdit):
-    def __init__(self, handler: logging.StreamHandler, parent=None):
+    def __init__(self, parent=None):
         QtWidgets.QTabWidget.__init__(self, parent)
         super().__init__(parent)
-        self.handler = handler
-        self.handler.message.connect(self.__updateText)
         self.setReadOnly(True)
+
     def __scrollDown(self):
         scroll = self.verticalScrollBar()
         end_text = scroll.maximum()
         scroll.setValue(end_text)
 
-    def __updateText(self, msg: str):
-        self.append(msg)
-        self.__scrollDown()
+    def updateText(self, msg: str):
+        try:
+            self.append(str(msg))
+            self.__scrollDown()
+        except Exception as e:
+            print(e)
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -153,12 +259,20 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
         self.tabs.currentChanged.connect(self.adjust_tab_sizes)
         self.const = Const
-        self.logger, self.special_handler = setup_logger()
+        self.console_log = LogWidget()
+
         self.main = MainPage(self, 'Main')
         self.tabs.addTab(self.main, self.main.title)
-        self.graph = GraphPage(self, 'Graph')
-        self.tabs.addTab(self.graph, self.graph.title)
 
+        self.signals = WorkerSignals()
+        self.manager = ProcessManager(self.signals)
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.manager.check_queues)
+        self.timer.start(100)
+        self.signals.output.connect(self.console_log.updateText)
+        self.signals.error.connect(self.console_log.updateText)
+        self.signals.result.connect(self.console_log.updateText)
 
     def adjust_tab_sizes(self):
         """resize core widget"""
@@ -172,50 +286,19 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self.adjust_tab_sizes()
 
-    def setup_calc(self):
-        """setup main calculation function separate from gui"""
+    def start_calc(self, target, process_name=None, args=[], kwargs={}):
+        if process_name is None:
+            process_name = target.__name__
 
-        self.parent_conn, self.child_conn = mul.Pipe()
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.check_pipe)
-        self.process = None
+        if process_name in self.manager.process_set:
+            pass  #already started
 
-    def start_calc(self):
-        if self.process and self.process.is_alive():
-            pass  # already started
-        self.process = Process(target=calc_process, args=(self.child_conn,
-                                                          self.const.RAW,
-                                                          self.const.ALN,
-                                                          self.const.DATASET,
-                                                          self.const.REF,
-                                                          self.const.DEV
-                                                          ))
-        self.process.start()
-        self.timer.start(100)
+        self.manager.run_process(target, process_name, args, kwargs)
 
-    def stop_calc(self):
-        if self.process and self.process.is_alive():
-            self.parent_conn.send(('command', 'stop'))
-            self.process.join()
-        self.timer.stop()
-        self.parent_conn.close()
-
-    def check_pipe(self):
-        while self.parent_conn.poll():
-            try:
-                msg_type, msg = self.parent_conn.recv()
-                if msg_type == 'data':
-                    self.graph.update(msg[0], msg[1])
-                    QApplication.processEvents()
-                elif msg_type == 'Info':
-                    self.logger.info(msg)
-                elif msg_type == 'Error':
-                    self.logger.error(msg)
-
-            except Exception as err:
-                print(err)
-                self.timer.stop()
-
+    def stop_calc(self, target, process_name=None):
+        if process_name is None:
+            process_name = target.__name__
+        err_out = self.manager.end_process(target, process_name)
 
 class MainPage(QWidget):
     def __init__(self, parent, title):
@@ -224,6 +307,7 @@ class MainPage(QWidget):
         self.parent = parent
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.splitter = QtWidgets.QSplitter(self)
+        self.const = Const
 
         form_panel = QtWidgets.QWidget()
         form_layout = QFormLayout()
@@ -232,7 +316,6 @@ class MainPage(QWidget):
         config_panel = QtWidgets.QWidget()
         config_layout = QtWidgets.QVBoxLayout()
         config_panel.setLayout(config_layout)
-        self.logger, self.special_handler = parent.logger, parent.special_handler
         self.setLayout(self.main_layout)
 
         # Raw
@@ -272,7 +355,7 @@ class MainPage(QWidget):
         self.splitter.addWidget(form_panel)
         self.splitter.addWidget(config_panel)
         self.main_layout.addWidget(self.splitter)
-        self.main_layout.addWidget(LogWidget(self.special_handler))
+        self.main_layout.addWidget(self.parent.console_log)
 
     @func_logger(full=True)
     def open_file(self, raw_filename):
@@ -310,62 +393,95 @@ class MainPage(QWidget):
 
     @func_logger()
     def signal(self):
-        self.parent.setup_calc()
-        self.parent.start_calc()
+        self.parent.start_calc(target=calc_process, args=(self.const.RAW,
+                                                          self.const.ALN,
+                                                          self.const.DATASET,
+                                                          self.const.REF,
+                                                          self.const.DEV
+                                                          ))
 
-class GraphPage(QWidget):
-    def __init__(self, parent, title='graph', x=None, y=None, x_label='x', y_label='y', color=(255, 255, 255),
+
+class MPLGraph(QWidget):
+    def __init__(self, parent, title='PlotPage', title_plot='plot', x_label='x', y_label='y', color=(255, 255, 255),
                  bg_color=(0, 0, 0)):
         super().__init__()
-        self.layout = QVBoxLayout()
+        layout = QVBoxLayout()
         self.title = title
-        self.Plot = pg.PlotWidget()
-        self.layout.addWidget(self.Plot)
-        self.setLayout(self.layout)
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        layout.addWidget(self.canvas)
+        layout.addWidget(self.toolbar)
+        self.setLayout(layout)
 
-        self.Plot.setLabel('bottom', x_label)
-        self.Plot.setLabel('left', y_label)
+        self.axes = self.figure.add_subplot(111)
+        self.axes.set_title(title_plot)
+        self.axes.set_xlabel(x_label)
+        self.axes.set_ylabel(y_label)
 
-        self.Plot.setBackground(bg_color)
-        if x is not None and y is not None:
-            self.x = x
-            self.y = y
-        else:
-            self.x = []
-            self.y = []
+    def set_plots(self, datapack, names):
+        self.axes.clear()
+        plot_count = len(names)
+        for i in range(plot_count):
+            data = datapack[i]
+            self.axes.plot(data[0], data[1], label=names[i])
+        self.axes.legend()
+        self.axes.grid(True)
+        self.canvas.draw()
 
-        pen = pg.mkPen(color=color)
-        self.data_line = self.Plot.plot(self.x, self.y, pen=pen)
 
-    @func_logger(add_info='GRAPH PAGE UPDATE')
-    def update(self, x=None, y=None):
-        self.x = x
-        self.y = y
-        self.data_line.setData(self.x, self.y)
+class MPLHeat(QWidget):
+    def __init__(self, parent, title='HeatmapPage', title_plot='heatmap'):
+        super().__init__()
+        layout = QVBoxLayout()
+        self.title = title
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        layout.addWidget(self.canvas)
+        layout.addWidget(self.toolbar)
+        self.setLayout(layout)
+
+        self.axes = self.figure.add_subplot(111)
+        self.axes.set_title(title_plot)
+
+    def set_heatmaps(self, datapack, names):
+        self.axes.clear()
+        plot_count = len(names)
+        vmin = min([np.min(data) for data in datapack])
+        vmax = max([np.max(data) for data in datapack])
+        for i in range(plot_count):
+            data = datapack[i]
+            self.axes.imshow(data, cmap='viridis', vmin=vmin, vmax=vmax, label=names[i])
+        self.axes.legend()
+        self.axes.grid(True)
+        self.canvas.draw()
 
 '''functions declaration'''
-def kde_process(dataset, num_dots=1000):
-    kde = stats.gaussian_kde(dataset)
-    x_vals = np.linspace(min(dataset), max(dataset), num_dots)
-    y_vals = kde.evaluate(x_vals)
-    return x_vals, y_vals
 
-def setup_logger():
-    logger = logging.getLogger('main')
-    logger.setLevel(logging.DEBUG)
 
-    log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+def kde_points(data, num_bins, left=None, right=None, center=False):
+    """gaussian KDE with fixed borders"""
+    if left is None: left = np.min(data)
+    if right is None: right = np.max(data)
+    if center: data = data - data.mean()
+    data = data.reshape(-1, 1)
+    x_grid = np.linspace(left, right, num_bins).reshape(-1, 1)
+    # Настройка KDE (можно менять ядро и bandwidth)
+    kde = KernelDensity(kernel='gaussian', bandwidth=0.1).fit(data)
+    # Логарифм плотности → преобразуем в обычную шкалу
+    log_density = kde.score_samples(x_grid)
+    dens = np.exp(log_density)
+    return dens
 
-    file_handler = logging.FileHandler(f'{__name__}.log', "w")
-    file_handler.setFormatter(log_formatter)
-    file_handler.setLevel(logging.INFO)
 
-    special_handler = SpecialHandler()
-    special_handler.setFormatter(log_formatter)
-    logger.addHandler(special_handler)
-    logger.addHandler(file_handler)
-
-    return logger, special_handler
+def heatmap_prepare_data(data, DEV, y):
+    """create matric for heatmap"""
+    n = len(data)
+    worker = partial(kde_points, **{"num_bins": y, "left": (-DEV), "right": (+DEV), 'center': True})
+    with Pool(4) as pool:
+        matrix = list(tqdm(pool.imap(worker, data, chunksize=1), total=n))
+    return np.array(matrix)
 
 @jit(nopython=True)
 def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray):
@@ -380,6 +496,7 @@ def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray):
         return arr_1, arr_2, True
     else:
         return arr_2, arr_1, False
+
 
 def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool):
     """
@@ -401,6 +518,7 @@ def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool):
     else:
         return arr_short, opt_long
 
+
 def get_index(dataset: np.ndarray, ds_id: int):
     """
     input - dataset - np.ndarray with full recorded data from attached HDF file
@@ -409,6 +527,7 @@ def get_index(dataset: np.ndarray, ds_id: int):
     """
     index_data = dataset[0]
     return np.where(index_data == ds_id)
+
 
 def verify_datasets(data_1: Dataset, data_2: Dataset, threshold=1.0):
     """
@@ -436,6 +555,7 @@ def verify_datasets(data_1: Dataset, data_2: Dataset, threshold=1.0):
         return get_opt_strip(*get_long_and_short(data1_new2, data2_new2))
     return data1_new, data2_new
 
+
 def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0):
     """
     input - dataset - Dataset object
@@ -454,6 +574,7 @@ def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0):
 
     return ref_index, dataset[ref_index]
 
+
 def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, limit=None):
     """
     initial data verifying and recording into Dataset objects
@@ -466,9 +587,9 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, lim
     else:
         set_num = int(limit)
 
-    dataset_list = np.empty((set_num, 2), dtype=Dataset)
+    dataset_list = np.empty((2, set_num), dtype=Dataset)
 
-    for index in tqdm(range(set_num)):
+    for index in tqdm(range(set_num), desc='Прогресс'):
         index_raw, index_aln = get_index(dataset_raw, index), get_index(dataset_aln, index)
 
         data_raw_unsorted = dataset_raw[1:3, index_raw[0][0]:index_raw[0][-1] + 1]
@@ -491,29 +612,90 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, lim
         checked_raw.reference = ref_raw
         checked_aln.reference = ref_aln
 
-        dataset_list[index, 0] = checked_raw
-        dataset_list[index, 1] = checked_aln
+        dataset_list[0, index] = np.array(checked_raw) - checked_raw.reference
+        dataset_list[1, index] = np.array(checked_aln) - checked_aln.reference
 
     return dataset_list
+
+
+def prepare_array(distances):
+    """prepare distances dataset"""
+    concatenated = np.array([np.concatenate(sub) for sub in distances])
+    indexes = np.repeat(np.arange(len(distances[0])), [len(sub_arr) for sub_arr in distances[0]])
+    pre_sorted = np.vstack((concatenated, indexes))
+    sorted = pre_sorted[:, pre_sorted[0].argsort()]
+    return sorted
+
+
+def find_dots(distances, DEV):
+    dots = []
+    counter = 0
+    is_in_list = set()
+    for i in tqdm(range(distances.shape[1])):
+        if not dots:
+            dots.append([])
+            dots[counter].append(distances[:2, i])
+            is_in_list.add(distances[2, i])
+        else:
+            if abs(distances[0, i] - dots[counter][0][0]) <= (2 * DEV):
+                if distances[2, i] in is_in_list:
+                    print(f'ERROR with {distances[2, i]}')
+                    pass
+                dots[counter].append(distances[:2, i])
+                is_in_list.add(distances[2, i])
+            else:
+                is_in_list.clear()
+                dots.append([distances[:2, i]])
+                is_in_list.add(distances[2, i])
+                counter += 1
+
+    dots_concat = [np.array(group).T for group in dots]
+
+    raw_dots_concat = [group[0] for group in dots_concat]
+    aln_dots_concat = [group[1] for group in dots_concat]
+
+    return raw_dots_concat, aln_dots_concat
+
 
 '''process main function'''
 
 
-def calc_process(conn, RAW, ALN, DATASET, REF, DEV):
-    conn.send(('Info', f'Process {calc_process.__name__} started'))
+def calc_process(RAW, ALN, DATASET, REF, DEV):
     try:
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-        dataset_list = read_dataset(features_raw, features_aln, REF, DEV)
-        raw_ref_list = np.array([ds.reference for ds in dataset_list[:, 0]])
-        aln_ref_list = np.array([ds.reference for ds in dataset_list[:, 1]])
-        x1, y1 = kde_process(aln_ref_list)
-        conn.send(('data', (x1, y1)))
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV, limit=100)
+
+        raw_dots, aln_dots = find_dots(prepare_array(distance_list), DEV)
+
+        raw_heat = heatmap_prepare_data(raw_dots, DEV, 700)
+        aln_heat = heatmap_prepare_data(aln_dots, DEV, 700)
+        ###############
+        # ONLY FOR TEST#
+        ###############
+        '''
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+        vmin = min(np.min(raw_heat), np.min(aln_heat))
+        vmax = max(np.max(raw_heat), np.max(aln_heat))
+
+        im1 = ax1.imshow(raw_heat, cmap='viridis', vmin=vmin, vmax=vmax, aspect='equal')
+
+        ax1.set_title('Raw')
+        fig.colorbar(im1, ax=ax1)
+
+        # Вторая тепловая карта
+        im2 = ax2.imshow(aln_heat, cmap='viridis', vmin=vmin, vmax=vmax, aspect='equal')
+        ax2.set_title('Aln')
+
+        im3 = ax3.imshow(raw_heat - aln_heat, cmap='RdBu_r', vmin=vmin, vmax=vmax, aspect='equal')
+        ax3.set_title('Diff')
+        fig.colorbar(im3, ax=ax3)
+        plt.tight_layout()
+        plt.show()
+        '''
+        return np.array((raw_heat, aln_heat))
     except Exception as e:
-        conn.send('Error', e)
-    finally:
-        conn.send(('Info', f'Process {calc_process.__name__} ended successfully'))
-        conn.close()
+        print(e)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
