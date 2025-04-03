@@ -19,23 +19,6 @@ from numba import jit
 from sklearn.neighbors import KernelDensity
 from tqdm import tqdm
 
-'''decorators declaration'''
-
-
-def func_logger(add_info='', full=False):
-    def actual_decorator(func):
-        def inner(*args, **kwargs):
-            logger = logging.getLogger('main')
-            ret = func(*args, **kwargs)
-            logger.info(f'Function {func.__name__}' + (f' with {args, kwargs} was called' if full else '') + (
-                f' ({add_info})' if add_info else ''))
-            return ret
-
-        return inner
-
-    return actual_decorator
-
-
 """classes declaration"""
 
 
@@ -101,19 +84,9 @@ class ProcessManager:
         try:
             sys.stdout = StreamRedirect(out_q)
             sys.stderr = StreamRedirect(error_q)
-
             result = target(*args, **kwargs)
+            ret_q.put((target.__name__, result))
 
-            if isinstance(result, np.ndarray):
-                shm = shared_memory.SharedMemory(create=True, size=result.nbytes)
-                shm_arr = np.ndarray(result.shape, dtype=result.dtype, buffer=shm.buf)
-                np.copyto(shm_arr, result)
-                print('with shared memory')
-                print((target.__name__, 'sh_mem', (shm.name, result.shape, result.dtype)))
-                ret_q.put((target.__name__, 'sh_mem', (shm.name, result.shape, result.dtype)))
-            else:
-                ret_q.put((target.__name__, 'direct', result))
-                print((target.__name__, 'direct', result))
         except Exception as e:
             error_q.put(e)
         finally:
@@ -123,13 +96,9 @@ class ProcessManager:
     def __check_return(self):
         while not self.return_q.empty():
             try:
-                func_name, msg_type, content = self.return_q.get_nowait()
-                # print('return from {}'.format(func_name))
-                if msg_type == 'direct':
-                    self.signals.result.emit(content)
-                elif msg_type == 'sh_mem':
-                    shm_name, shape, dtype = content
-                    self._process_shmem(shm_name, shape, dtype)
+                func_name, content = self.return_q.get_nowait()
+                print('return from {}'.format(func_name))
+                self.signals.result.emit(content)
             except Empty:
                 break
             except Exception as e:
@@ -168,7 +137,6 @@ class ProcessManager:
             self.error_q.put(e)
         finally:
             existing_shm.close()
-            existing_shm.unlink()
 
 class LinkedList(np.ndarray):
     def __new__(cls, input_array, linked_array=None):
@@ -357,13 +325,11 @@ class MainPage(QWidget):
         self.main_layout.addWidget(self.splitter)
         self.main_layout.addWidget(self.parent.console_log)
 
-    @func_logger(full=True)
     def open_file(self, raw_filename):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "HDF (*.hdf,*.h5,,'*.hdf5');;All Files (*)")
         if not filename: return
         raw_filename.setText(filename)
 
-    @func_logger(full=True)
     def open_config(self):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "yaml (*.yaml);;All Files (*)")
         if not filename: return
@@ -375,7 +341,6 @@ class MainPage(QWidget):
             self.dev_set.setText(str(yaml_config['DEV']))
             self.dataset.setText(str(yaml_config['DATASET']))
 
-    @func_logger(full=True)
     def save_config(self):
         try:
             data = (self.raw_filename.text(),
@@ -391,7 +356,6 @@ class MainPage(QWidget):
         except Exception as e:
             print(e)
 
-    @func_logger()
     def signal(self):
         self.parent.start_calc(target=calc_process, args=(self.const.RAW,
                                                           self.const.ALN,
