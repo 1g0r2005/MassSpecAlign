@@ -1,7 +1,7 @@
 import logging
 import sys
 from functools import partial
-from multiprocessing import Process, Queue, shared_memory, Pool
+from multiprocessing import Process, Queue, Pool, freeze_support
 from pathlib import Path
 from queue import Empty
 
@@ -13,9 +13,10 @@ from PyQt5.QtCore import QTimer, QObject, pyqtSignal
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QVBoxLayout, QLineEdit, QLabel, QPushButton, \
     QFormLayout, QFileDialog
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.backends.backend_template import FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from numba import jit
+from scipy.stats import levene
 from sklearn.neighbors import KernelDensity
 from tqdm import tqdm
 
@@ -59,7 +60,9 @@ class ProcessManager:
 
         self.process_set = set()
 
-    def run_process(self, target, target_name, args=(), kwargs=None):
+    def run_process(self, target, target_name, args=None, kwargs=None):
+        if args is None:
+            args = []
         if kwargs is None:
             kwargs = {}
         p = Process(target=self._std_wrapper, args=(target, self.output_q, self.error_q, self.return_q, args, kwargs))
@@ -80,7 +83,6 @@ class ProcessManager:
     def _std_wrapper(target, out_q, error_q, ret_q, args=(), kwargs=None):
         if kwargs is None:
             kwargs = {}
-        shm = None
         try:
             sys.stdout = StreamRedirect(out_q)
             sys.stderr = StreamRedirect(error_q)
@@ -127,16 +129,6 @@ class ProcessManager:
         self.__check_error()
         self.__check_out()
 
-    def _process_shmem(self, shm_name, shape, dtype):
-        existing_shm = None
-        try:
-            existing_shm = shared_memory.SharedMemory(name=shm_name)
-            arr = np.ndarray(shape, dtype=dtype, buffer=existing_shm.buf).copy()
-            self.signals.result.emit(arr)
-        except Exception as e:
-            self.error_q.put(e)
-        finally:
-            existing_shm.close()
 
 class LinkedList(np.ndarray):
     def __new__(cls, input_array, linked_array=None):
@@ -216,6 +208,7 @@ class LogWidget(QtWidgets.QTextEdit):
         except Exception as e:
             print(e)
 
+
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -232,6 +225,12 @@ class MainWindow(QMainWindow):
         self.main = MainPage(self, 'Main')
         self.tabs.addTab(self.main, self.main.title)
 
+        self.graph = MPLGraph(self, x_label='m/z', y_label='dens')
+        self.tabs.addTab(self.graph, self.graph.title)
+
+        self.heat = MPLHeat(self)
+        self.tabs.addTab(self.heat, self.heat.title)
+
         self.signals = WorkerSignals()
         self.manager = ProcessManager(self.signals)
 
@@ -241,6 +240,7 @@ class MainWindow(QMainWindow):
         self.signals.output.connect(self.console_log.updateText)
         self.signals.error.connect(self.console_log.updateText)
         self.signals.result.connect(self.console_log.updateText)
+        # self.signals.result.connect(self.graph.set_plots)
 
     def adjust_tab_sizes(self):
         """resize core widget"""
@@ -254,7 +254,11 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self.adjust_tab_sizes()
 
-    def start_calc(self, target, process_name=None, args=[], kwargs={}):
+    def start_calc(self, target, process_name=None, args=None, kwargs=None):
+        if kwargs is None:
+            kwargs = {}
+        if args is None:
+            args = []
         if process_name is None:
             process_name = target.__name__
 
@@ -263,10 +267,7 @@ class MainWindow(QMainWindow):
 
         self.manager.run_process(target, process_name, args, kwargs)
 
-    def stop_calc(self, target, process_name=None):
-        if process_name is None:
-            process_name = target.__name__
-        err_out = self.manager.end_process(target, process_name)
+
 
 class MainPage(QWidget):
     def __init__(self, parent, title):
@@ -357,68 +358,75 @@ class MainPage(QWidget):
             print(e)
 
     def signal(self):
-        self.parent.start_calc(target=calc_process, args=(self.const.RAW,
-                                                          self.const.ALN,
-                                                          self.const.DATASET,
-                                                          self.const.REF,
-                                                          self.const.DEV
-                                                          ))
+        self.parent.start_calc(target=find_dots_process, args=(self.const.RAW,
+                                                               self.const.ALN,
+                                                               self.const.DATASET,
+                                                               self.const.REF,
+                                                               self.const.DEV
+                                                               ))
 
+
+class MplCanvas(FigureCanvasQTAgg):
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        self.axes = fig.add_subplot(111)
+        super().__init__(fig)
 
 class MPLGraph(QWidget):
+
     def __init__(self, parent, title='PlotPage', title_plot='plot', x_label='x', y_label='y', color=(255, 255, 255),
                  bg_color=(0, 0, 0)):
         super().__init__()
+        self.parent = parent
         layout = QVBoxLayout()
         self.title = title
         self.figure = Figure()
-        self.canvas = FigureCanvas(self.figure)
+        self.canvas = MplCanvas(parent)
         self.toolbar = NavigationToolbar(self.canvas, self)
         layout.addWidget(self.canvas)
         layout.addWidget(self.toolbar)
         self.setLayout(layout)
 
-        self.axes = self.figure.add_subplot(111)
-        self.axes.set_title(title_plot)
-        self.axes.set_xlabel(x_label)
-        self.axes.set_ylabel(y_label)
+        self.canvas.axes.set_title(title_plot)
+        self.canvas.axes.set_xlabel(x_label)
+        self.canvas.axes.set_ylabel(y_label)
 
-    def set_plots(self, datapack, names):
-        self.axes.clear()
-        plot_count = len(names)
+    def set_plots(self, datapack, names=None):
+        self.canvas.axes.clear()
+        plot_count = len(datapack)
+        if names is None: names = [i for i in range(plot_count)]
         for i in range(plot_count):
             data = datapack[i]
-            self.axes.plot(data[0], data[1], label=names[i])
-        self.axes.legend()
-        self.axes.grid(True)
+            self.canvas.axes.scatter(data[0], data[1], label=names[i])
+        self.canvas.axes.legend()
+        self.canvas.axes.grid(True)
         self.canvas.draw()
 
 
 class MPLHeat(QWidget):
     def __init__(self, parent, title='HeatmapPage', title_plot='heatmap'):
         super().__init__()
+        self.parent = parent
         layout = QVBoxLayout()
         self.title = title
-        self.figure = Figure()
-        self.canvas = FigureCanvas(self.figure)
+        self.canvas = MplCanvas(parent)
         self.toolbar = NavigationToolbar(self.canvas, self)
         layout.addWidget(self.canvas)
         layout.addWidget(self.toolbar)
         self.setLayout(layout)
 
-        self.axes = self.figure.add_subplot(111)
-        self.axes.set_title(title_plot)
+        self.canvas.axes.set_title(title_plot)
 
     def set_heatmaps(self, datapack, names):
-        self.axes.clear()
+        self.canvas.axes.clear()
         plot_count = len(names)
         vmin = min([np.min(data) for data in datapack])
         vmax = max([np.max(data) for data in datapack])
         for i in range(plot_count):
             data = datapack[i]
-            self.axes.imshow(data, cmap='viridis', vmin=vmin, vmax=vmax, label=names[i])
-        self.axes.legend()
-        self.axes.grid(True)
+            self.canvas.axes.imshow(data, cmap='viridis', vmin=vmin, vmax=vmax, label=names[i])
+        self.canvas.axes.legend()
+        self.canvas.axes.grid(True)
         self.canvas.draw()
 
 '''functions declaration'''
@@ -432,15 +440,15 @@ def kde_points(data, num_bins, left=None, right=None, center=False):
     data = data.reshape(-1, 1)
     x_grid = np.linspace(left, right, num_bins).reshape(-1, 1)
     # Настройка KDE (можно менять ядро и bandwidth)
-    kde = KernelDensity(kernel='gaussian', bandwidth=0.1).fit(data)
+    kde_obj = KernelDensity(kernel='gaussian', bandwidth=0.1).fit(data)
     # Логарифм плотности → преобразуем в обычную шкалу
-    log_density = kde.score_samples(x_grid)
+    log_density = kde_obj.score_samples(x_grid)
     dens = np.exp(log_density)
     return dens
 
 
 def heatmap_prepare_data(data, DEV, y):
-    """create matric for heatmap"""
+    """create matrix for heatmap"""
     n = len(data)
     worker = partial(kde_points, **{"num_bins": y, "left": (-DEV), "right": (+DEV), 'center': True})
     with Pool(4) as pool:
@@ -452,8 +460,6 @@ def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray):
     """
     input - arr_1, arr_2 - two np.ndarray, possibly not equal size
     return - tuple with two arrays (long, short)
-
-    warning: using JIT compilation for acceleration
     """
     size1, size2 = arr_1.shape[0], arr_2.shape[0]
     if size1 > size2:
@@ -612,56 +618,68 @@ def find_dots(distances, DEV):
                 dots.append([distances[:2, i]])
                 is_in_list.add(distances[2, i])
                 counter += 1
-
+    print(dots)
     dots_concat = [np.array(group).T for group in dots]
-
-    raw_dots_concat = [group[0] for group in dots_concat]
+    print(dots_concat)
+    raw_dots_concat = [group[0] for group in dots_concat]  # delete arrays from one element (outliers)
     aln_dots_concat = [group[1] for group in dots_concat]
 
     return raw_dots_concat, aln_dots_concat
 
 
+def variance(arr1, arr2, REF, p=0.05):
+    """calculate standard deviations for two arrays and check """
+    coord = np.mean(np.hstack((arr1, arr2))) + REF  # restore m/z for dots
+    var_1, var_2 = np.std(arr1), np.std(arr2)
+    # print(f'var1 = {var_1}, var2 = {var_2}')
+    delta_dev = var_2 - var_1
+    stat, p_value = levene(arr1, arr2)
+    if np.isnan(p_value):
+        # print(f'ERROR with {arr1} and {arr2}')
+        p_value = 0.0
+    return coord, delta_dev, p_value
+
+
 '''process main function'''
 
 
-def calc_process(RAW, ALN, DATASET, REF, DEV):
+def process_wrapper(args):
+    """Обертка для обработки одной итерации"""
+    i, raw, aln, REF = args
+    coord, delta_dev, p_value = variance(raw, aln, REF)
+    return i, coord, delta_dev, p_value
+
+
+def find_dots_process(RAW, ALN, DATASET, REF, DEV):
+    P = 0.05
     try:
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV, limit=100)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV, limit=300)
 
-        raw_dots, aln_dots = find_dots(prepare_array(distance_list), DEV)
+        raw_dots, aln_dots = find_dots(prepare_array(distance_list), 1)
+        n_dots = len(raw_dots)
+        print(n_dots)
+        delta_dev_list = np.empty((2, n_dots), dtype=float)
+        p_value_list = np.empty((2, n_dots), dtype=float)
 
-        raw_heat = heatmap_prepare_data(raw_dots, DEV, 700)
-        aln_heat = heatmap_prepare_data(aln_dots, DEV, 700)
-        ###############
-        # ONLY FOR TEST#
-        ###############
-        '''
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
-        vmin = min(np.min(raw_heat), np.min(aln_heat))
-        vmax = max(np.max(raw_heat), np.max(aln_heat))
+        tasks = [(i, raw_dots[i], aln_dots[i], REF) for i in range(n_dots)]
 
-        im1 = ax1.imshow(raw_heat, cmap='viridis', vmin=vmin, vmax=vmax, aspect='equal')
+        with Pool(processes=4) as pool:
+            # Используем imap_unordered для прогресс-бара и экономии памяти
+            results = list(tqdm(pool.imap_unordered(process_wrapper, tasks),
+                                total=n_dots))
+        for i, coord, delta_dev, p_value in results:
+            delta_dev_list[:, i] = [coord, delta_dev]
+            p_value_list[:, i] = [coord, p_value]
 
-        ax1.set_title('Raw')
-        fig.colorbar(im1, ax=ax1)
-
-        # Вторая тепловая карта
-        im2 = ax2.imshow(aln_heat, cmap='viridis', vmin=vmin, vmax=vmax, aspect='equal')
-        ax2.set_title('Aln')
-
-        im3 = ax3.imshow(raw_heat - aln_heat, cmap='RdBu_r', vmin=vmin, vmax=vmax, aspect='equal')
-        ax3.set_title('Diff')
-        fig.colorbar(im3, ax=ax3)
-        plt.tight_layout()
-        plt.show()
-        '''
-        return np.array((raw_heat, aln_heat))
+        return delta_dev_list, p_value_list
     except Exception as e:
         print(e)
 
+
 if __name__ == '__main__':
+    freeze_support()
     app = QApplication(sys.argv)
     main_window = MainWindow()
     main_window.show()
