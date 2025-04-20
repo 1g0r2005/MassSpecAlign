@@ -1,23 +1,17 @@
-import logging
 import sys
-from functools import partial
-from multiprocessing import Process, Queue, Pool, freeze_support
+from multiprocessing import Process, Queue
 from pathlib import Path
 from queue import Empty
 
 import h5py
 import numpy as np
+import pyqtgraph as pg
 import yaml
+from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QVBoxLayout, QLineEdit, QLabel, QPushButton, \
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
     QFormLayout, QFileDialog
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-from numba import jit
-from scipy.stats import levene
-from sklearn.neighbors import KernelDensity
 from tqdm import tqdm
 
 """classes declaration"""
@@ -31,6 +25,8 @@ class Const:
     DATASET = None
     REF = None
     DEV = None
+    N_DOTS = None
+    BW = None
 
 
 class WorkerSignals(QObject):
@@ -183,10 +179,10 @@ class File:
                     data = f[dataset][:]
                     return data
         except FileNotFoundError:
-            logging.error(f'File {self.real_path} not found')
+            print(f'File {self.real_path} not found')
             return None
         except Exception as err:
-            logging.error(f'Reading Error: {err}')
+            print(f'Reading Error: {err}')
             return None
 
 
@@ -225,11 +221,8 @@ class MainWindow(QMainWindow):
         self.main = MainPage(self, 'Main')
         self.tabs.addTab(self.main, self.main.title)
 
-        self.graph = MPLGraph(self, x_label='m/z', y_label='dens')
+        self.graph = GraphPage(self, x_label='m/z', y_label='dens', title='Plot')
         self.tabs.addTab(self.graph, self.graph.title)
-
-        self.heat = MPLHeat(self)
-        self.tabs.addTab(self.heat, self.heat.title)
 
         self.signals = WorkerSignals()
         self.manager = ProcessManager(self.signals)
@@ -240,7 +233,7 @@ class MainWindow(QMainWindow):
         self.signals.output.connect(self.console_log.updateText)
         self.signals.error.connect(self.console_log.updateText)
         self.signals.result.connect(self.console_log.updateText)
-        # self.signals.result.connect(self.graph.set_plots)
+        self.signals.result.connect(lambda ds: self.graph.add_plot_mul(ds))
 
     def adjust_tab_sizes(self):
         """resize core widget"""
@@ -266,7 +259,6 @@ class MainWindow(QMainWindow):
             pass  #already started
 
         self.manager.run_process(target, process_name, args, kwargs)
-
 
 
 class MainPage(QWidget):
@@ -305,11 +297,15 @@ class MainPage(QWidget):
         self.dataset = QLineEdit()
         self.ref_set = QLineEdit()
         self.dev_set = QLineEdit()
+        self.bw_set = QLineEdit()
+        self.n_dots_set = QLineEdit()
         form_layout.addRow(QLabel("Raw data:"), self.raw_layout)
         form_layout.addRow(QLabel("Alignment data:"), self.aln_layout)
         form_layout.addRow(QLabel("Dataset:"), self.dataset)
         form_layout.addRow(QLabel("Reference point:"), self.ref_set)
-        form_layout.addRow(QLabel("Acceptable deviation:"), self.dev_set)
+        form_layout.addRow(QLabel("Acceptable deviation for msalign:"), self.dev_set)
+        form_layout.addRow(QLabel("Bandwidth:"), self.bw_set)
+        form_layout.addRow(QLabel("Number of dots:"), self.n_dots_set)
 
         self.config_button = QPushButton("Browse config")
         self.config_button.clicked.connect(lambda: self.open_config())
@@ -341,6 +337,9 @@ class MainPage(QWidget):
             self.ref_set.setText(str(yaml_config['REF']))
             self.dev_set.setText(str(yaml_config['DEV']))
             self.dataset.setText(str(yaml_config['DATASET']))
+            self.bw_set.setText(str(yaml_config['BW']))
+            self.n_dots_set.setText(str(yaml_config['NDOTS']))
+
 
     def save_config(self):
         try:
@@ -348,11 +347,14 @@ class MainPage(QWidget):
                     self.aln_filename.text(),
                     self.ref_set.text(),
                     self.dev_set.text(),
-                    self.dataset.text())
+                    self.dataset.text(),
+                    self.bw_set.text(),
+                    self.n_dots_set.text())
             if '' in data:
                 raise Exception('Empty string')
-            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET = data[0], data[1], float(data[2]), float(
-                data[3]), data[4]
+            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET, Const.BW, Const.N_DOTS = data[0], data[1], float(
+                data[2]), float(
+                data[3]), data[4], float(data[5]), int(data[6])
             self.calc_button.setEnabled(True)
         except Exception as e:
             print(e)
@@ -362,100 +364,41 @@ class MainPage(QWidget):
                                                                self.const.ALN,
                                                                self.const.DATASET,
                                                                self.const.REF,
-                                                               self.const.DEV
+                                                               self.const.DEV,
+                                                               self.const.BW,
+                                                               self.const.N_DOTS
                                                                ))
 
 
-class MplCanvas(FigureCanvasQTAgg):
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
-        fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.add_subplot(111)
-        super().__init__(fig)
-
-class MPLGraph(QWidget):
+class GraphPage(QWidget):
 
     def __init__(self, parent, title='PlotPage', title_plot='plot', x_label='x', y_label='y', color=(255, 255, 255),
                  bg_color=(0, 0, 0)):
+
         super().__init__()
         self.parent = parent
-        layout = QVBoxLayout()
         self.title = title
-        self.figure = Figure()
-        self.canvas = MplCanvas(parent)
-        self.toolbar = NavigationToolbar(self.canvas, self)
-        layout.addWidget(self.canvas)
-        layout.addWidget(self.toolbar)
-        self.setLayout(layout)
+        self.plot_space = pg.PlotWidget()
+        self.plot_space.setTitle(self.title)
+        self.plot_space.setBackground(bg_color)
+        self.plot_space.showGrid(x=True, y=True)
+        self.layout = QtWidgets.QHBoxLayout()
+        self.setLayout(self.layout)
+        self.layout.addWidget(self.plot_space)
 
-        self.canvas.axes.set_title(title_plot)
-        self.canvas.axes.set_xlabel(x_label)
-        self.canvas.axes.set_ylabel(y_label)
+    def add_plot(self, data, plot_name, color):
+        pen = pg.mkPen(color=color)
+        self.plot_space.plot(data[0], data[1], name=plot_name, pen=pen)
+
+    def add_plot_mul(self, ds):
+        for data in ds:
+            self.add_plot(data[0], data[1], data[2])
 
     def set_plots(self, datapack, names=None):
-        self.canvas.axes.clear()
-        plot_count = len(datapack)
-        if names is None: names = [i for i in range(plot_count)]
-        for i in range(plot_count):
-            data = datapack[i]
-            self.canvas.axes.scatter(data[0], data[1], label=names[i])
-        self.canvas.axes.legend()
-        self.canvas.axes.grid(True)
-        self.canvas.draw()
-
-
-class MPLHeat(QWidget):
-    def __init__(self, parent, title='HeatmapPage', title_plot='heatmap'):
-        super().__init__()
-        self.parent = parent
-        layout = QVBoxLayout()
-        self.title = title
-        self.canvas = MplCanvas(parent)
-        self.toolbar = NavigationToolbar(self.canvas, self)
-        layout.addWidget(self.canvas)
-        layout.addWidget(self.toolbar)
-        self.setLayout(layout)
-
-        self.canvas.axes.set_title(title_plot)
-
-    def set_heatmaps(self, datapack, names):
-        self.canvas.axes.clear()
-        plot_count = len(names)
-        vmin = min([np.min(data) for data in datapack])
-        vmax = max([np.max(data) for data in datapack])
-        for i in range(plot_count):
-            data = datapack[i]
-            self.canvas.axes.imshow(data, cmap='viridis', vmin=vmin, vmax=vmax, label=names[i])
-        self.canvas.axes.legend()
-        self.canvas.axes.grid(True)
-        self.canvas.draw()
+        pass
 
 '''functions declaration'''
 
-
-def kde_points(data, num_bins, left=None, right=None, center=False):
-    """gaussian KDE with fixed borders"""
-    if left is None: left = np.min(data)
-    if right is None: right = np.max(data)
-    if center: data = data - data.mean()
-    data = data.reshape(-1, 1)
-    x_grid = np.linspace(left, right, num_bins).reshape(-1, 1)
-    # Настройка KDE (можно менять ядро и bandwidth)
-    kde_obj = KernelDensity(kernel='gaussian', bandwidth=0.1).fit(data)
-    # Логарифм плотности → преобразуем в обычную шкалу
-    log_density = kde_obj.score_samples(x_grid)
-    dens = np.exp(log_density)
-    return dens
-
-
-def heatmap_prepare_data(data, DEV, y):
-    """create matrix for heatmap"""
-    n = len(data)
-    worker = partial(kde_points, **{"num_bins": y, "left": (-DEV), "right": (+DEV), 'center': True})
-    with Pool(4) as pool:
-        matrix = list(tqdm(pool.imap(worker, data, chunksize=1), total=n))
-    return np.array(matrix)
-
-@jit(nopython=True)
 def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray):
     """
     input - arr_1, arr_2 - two np.ndarray, possibly not equal size
@@ -582,8 +525,8 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, lim
         checked_raw.reference = ref_raw
         checked_aln.reference = ref_aln
 
-        dataset_list[0, index] = np.array(checked_raw) - checked_raw.reference
-        dataset_list[1, index] = np.array(checked_aln) - checked_aln.reference
+        dataset_list[0, index] = np.array(checked_raw)  # - checked_raw.reference
+        dataset_list[1, index] = np.array(checked_aln)  # - checked_aln.reference
 
     return dataset_list
 
@@ -597,89 +540,28 @@ def prepare_array(distances):
     return sorted
 
 
-def find_dots(distances, DEV):
-    dots = []
-    counter = 0
-    is_in_list = set()
-    for i in tqdm(range(distances.shape[1])):
-        if not dots:
-            dots.append([])
-            dots[counter].append(distances[:2, i])
-            is_in_list.add(distances[2, i])
-        else:
-            if abs(distances[0, i] - dots[counter][0][0]) <= (2 * DEV):
-                if distances[2, i] in is_in_list:
-                    print(f'ERROR with {distances[2, i]}')
-                    pass
-                dots[counter].append(distances[:2, i])
-                is_in_list.add(distances[2, i])
-            else:
-                is_in_list.clear()
-                dots.append([distances[:2, i]])
-                is_in_list.add(distances[2, i])
-                counter += 1
-    print(dots)
-    dots_concat = [np.array(group).T for group in dots]
-    print(dots_concat)
-    raw_dots_concat = [group[0] for group in dots_concat]  # delete arrays from one element (outliers)
-    aln_dots_concat = [group[1] for group in dots_concat]
-
-    return raw_dots_concat, aln_dots_concat
-
-
-def variance(arr1, arr2, REF, p=0.05):
-    """calculate standard deviations for two arrays and check """
-    coord = np.mean(np.hstack((arr1, arr2))) + REF  # restore m/z for dots
-    var_1, var_2 = np.std(arr1), np.std(arr2)
-    # print(f'var1 = {var_1}, var2 = {var_2}')
-    delta_dev = var_2 - var_1
-    stat, p_value = levene(arr1, arr2)
-    if np.isnan(p_value):
-        # print(f'ERROR with {arr1} and {arr2}')
-        p_value = 0.0
-    return coord, delta_dev, p_value
-
-
 '''process main function'''
 
 
-def process_wrapper(args):
-    """Обертка для обработки одной итерации"""
-    i, raw, aln, REF = args
-    coord, delta_dev, p_value = variance(raw, aln, REF)
-    return i, coord, delta_dev, p_value
-
-
-def find_dots_process(RAW, ALN, DATASET, REF, DEV):
+def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
     P = 0.05
     try:
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV, limit=300)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV, limit=100)
 
-        raw_dots, aln_dots = find_dots(prepare_array(distance_list), 1)
-        n_dots = len(raw_dots)
-        print(n_dots)
-        delta_dev_list = np.empty((2, n_dots), dtype=float)
-        p_value_list = np.empty((2, n_dots), dtype=float)
+        distance_list_prepared = prepare_array(distance_list)
+        raw_concat, aln_concat, id_concat = distance_list_prepared
 
-        tasks = [(i, raw_dots[i], aln_dots[i], REF) for i in range(n_dots)]
+        kde_x_raw, kde_y_raw = FFTKDE(bw=BW).fit(raw_concat).evaluate(N_DOTS)
+        kde_x_aln, kde_y_aln = FFTKDE(bw=BW).fit(aln_concat).evaluate(N_DOTS)
+        return ((kde_x_raw, kde_y_raw), 'raw', 'red'), ((kde_x_aln, kde_y_aln), 'aln', 'blue')
 
-        with Pool(processes=4) as pool:
-            # Используем imap_unordered для прогресс-бара и экономии памяти
-            results = list(tqdm(pool.imap_unordered(process_wrapper, tasks),
-                                total=n_dots))
-        for i, coord, delta_dev, p_value in results:
-            delta_dev_list[:, i] = [coord, delta_dev]
-            p_value_list[:, i] = [coord, p_value]
-
-        return delta_dev_list, p_value_list
     except Exception as e:
         print(e)
 
 
 if __name__ == '__main__':
-    freeze_support()
     app = QApplication(sys.argv)
     main_window = MainWindow()
     main_window.show()
