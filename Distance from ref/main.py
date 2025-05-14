@@ -1,3 +1,5 @@
+import math
+import math
 import sys
 from multiprocessing import Process, Queue
 from pathlib import Path
@@ -6,12 +8,16 @@ from queue import Empty
 import h5py
 import numpy as np
 import pyqtgraph as pg
+import scipy.stats as stats
 import yaml
+from IPython.external.qt_for_kernel import QtCore
 from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
     QFormLayout, QFileDialog
+from diptest import dipstat
+from numba import jit
 from tqdm import tqdm
 
 """classes declaration"""
@@ -53,7 +59,6 @@ class ProcessManager:
         self.output_q = Queue()
         self.error_q = Queue()
         self.return_q = Queue()
-
         self.process_set = set()
 
     def run_process(self, target, target_name, args=None, kwargs=None):
@@ -70,6 +75,8 @@ class ProcessManager:
         if target_name in self.process_set:
             try:
                 process.join()
+                if len(self.process_set) == 0:
+                    self.shared_memory.unlink()
             except Exception as e:
                 self.error_q.put(e)
         else:
@@ -148,6 +155,13 @@ class LinkedList(np.ndarray):
 
         self[:] = sorted_self
         self.linked_array[:] = sorted_linked
+
+    def sync_delete(self, index):
+        new_self = np.delete(self, index)
+        if self.linked_array is not None:
+            new_linked_array = np.delete(self.linked_array, index, axis=0)
+            return LinkedList(new_self, new_linked_array)
+        return new_self
 
 
 class Dataset(LinkedList):
@@ -233,7 +247,14 @@ class MainWindow(QMainWindow):
         self.signals.output.connect(self.console_log.updateText)
         self.signals.error.connect(self.console_log.updateText)
         self.signals.result.connect(self.console_log.updateText)
-        self.signals.result.connect(lambda ds: self.graph.add_plot_mul(ds))
+        # self.signals.result.connect(lambda ds: self.graph.add_plot_mul(ds))
+        self.signals.result.connect(self.redirect_outputs)
+
+    def redirect_outputs(self, ret):
+        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stat.show}
+        for output in ret:
+            self.aval_func[output[0]](output[1])
+
 
     def adjust_tab_sizes(self):
         """resize core widget"""
@@ -246,6 +267,7 @@ class MainWindow(QMainWindow):
         """resize core widget - event catch"""
         super().resizeEvent(event)
         self.adjust_tab_sizes()
+
 
     def start_calc(self, target, process_name=None, args=None, kwargs=None):
         if kwargs is None:
@@ -390,16 +412,140 @@ class GraphPage(QWidget):
         pen = pg.mkPen(color=color)
         self.plot_space.plot(data[0], data[1], name=plot_name, pen=pen)
 
-    def add_plot_mul(self, ds):
-        for data in ds:
-            self.add_plot(data[0], data[1], data[2])
+    def add_line(self, data, y_max, color):
+        pen = pg.mkPen(color=color, style=QtCore.Qt.DashLine)
+        y_min = 0
+        x = np.column_stack([data,
+                             data,
+                             np.full_like(data, np.nan)]).ravel()
+        y = np.column_stack([np.full_like(data, y_min),
+                             np.full_like(data, y_max),
+                             np.full_like(data, np.nan)]).ravel()
+        self.plot_space.plot(x, y, pen=pen)
+        #self.plot_space.addItem(pg.InfiniteLine(pos=x,angle=90,pen=pen,movable=False))
 
-    def set_plots(self, datapack, names=None):
-        pass
+    def add_plot_mul(self, ds):
+        #print(ds)
+        for data in ds:
+            if data[-1] == 'p':
+                self.add_plot(data[0], data[1], data[2])
+            elif data[-1] == 'vln':
+                self.add_line(data[0], data[1], data[3])
+
+
+class GraphPageMul(QWidget):
+    def __init__(self, parent, canvas_count=1, title='PlotPage', title_plots=None, x_labels=None, y_labels=None,
+                 color=(255, 255, 255),
+                 bg_color=(0, 0, 0)):
+        super().__init__()
+
+        if x_labels is None: x_labels = ['x'] * canvas_count
+        if y_labels is None: y_labels = ['y'] * canvas_count
+        if title_plots is None: title_plots = [f'plot{i}' for i in range(canvas_count)]
+
+        self.canvas_adj = {title_plots[i]: i for i in range(canvas_count)}
+
+        self.parent = parent
+        self.title = title
+        self.plot_spaces = [pg.PlotWidget() for i in range(canvas_count)]
+        self.layout = QtWidgets.QVBoxLayout()
+        self.setLayout(self.layout)
+        for i in range(canvas_count):
+            self.plot_spaces[i].showGrid(x=True, y=True)
+            self.plot_spaces[i].setTitle(title_plots[i])
+            self.layout.addWidget(self.plot_spaces[i])
+
+        def add_plot(self, data, plot_name, color, canvas_name=None):
+            if canvas_name is None:
+                plot_id = 0
+            else:
+                plot_id = self.canvas_adj[canvas_name]
+
+            pen = pg.mkPen(color=color)
+            self.plot_spaces[plot_id].plot(data[0], data[1], name=plot_name, pen=pen)
+
+        def add_line(self, data, y_max, color, canvas_name=None):
+            if canvas_name is None:
+                plot_id = 0
+            else:
+                plot_id = self.canvas_adj[canvas_name]
+
+            pen = pg.mkPen(color=color, style=QtCore.Qt.DashLine)
+            y_min = 0
+            x = np.column_stack([data,
+                                 data,
+                                 np.full_like(data, np.nan)]).ravel()
+            y = np.column_stack([np.full_like(data, y_min),
+                                 np.full_like(data, y_max),
+                                 np.full_like(data, np.nan)]).ravel()
+            self.plot_spaces[plot_id].plot(x, y, pen=pen)
+            # self.plot_space.addItem(pg.InfiniteLine(pos=x,angle=90,pen=pen,movable=False))
+
+        def add_plot_mul(self, ds):
+            # print(ds)
+            for data in ds:
+                if data[-1] == 'p':
+                    self.add_plot(data[0], data[1], data[2], data[-1])
+                elif data[-1] == 'vln':
+                    self.add_line(data[0], data[1], data[3], data[-1])
+
+
 
 '''functions declaration'''
 
-def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray):
+
+def peak_picking(X, Y, oversegmentation_filter=0, peak_location=1):
+    n = X.size
+    # Robust valley finding
+    h = np.concatenate(([-1], np.where(np.diff(Y) != 0)[0], [n - 1]))
+    g = (np.diff(Y[[h[1], *h[1:]]]) <= 0) & (np.diff(Y[[*h[1:], h[-1]]]) >= 0)
+
+    left_min = h[np.concatenate([g, [False]])] + 1
+    right_min = h[np.concatenate([[False], g])]
+    left_min = left_min[:-1]
+    right_min = right_min[1:]
+    # Compute max and min for every peak
+    size = left_min.shape
+    val_max = np.empty(size)
+    pos_peak = np.empty(size)
+    for idx, [lm, rm] in enumerate(zip(left_min, right_min)):
+        pp = lm + np.argmax(Y[lm:rm])
+        vm = np.max(Y[lm:rm])
+        val_max[idx] = vm
+        pos_peak[idx] = pp
+
+    # Remove oversegmented peaks
+    while True:
+        peak_thld = val_max * peak_location - math.sqrt(np.finfo(float).eps)
+        pkX = np.empty(left_min.shape)
+
+        for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_thld)):
+            mask = Y[lm:rm] >= th
+            if np.sum(mask) == 0:
+                pkX[idx] = np.nan
+            else:
+                pkX[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
+        dpkX = np.concatenate(([np.inf], np.diff(pkX), [np.inf]))
+
+        j = np.where((dpkX[1:-1] <= oversegmentation_filter) & (dpkX[1:-1] <= dpkX[:-2]) & (dpkX[1:-1] < dpkX[2:]))[0]
+        if j.size == 0:
+            break
+        left_min = np.delete(left_min, j + 1)
+        right_min = np.delete(right_min, j)
+
+        val_max[j] = np.maximum(val_max[j], val_max[j + 1])
+        val_max = np.delete(val_max, j + 1)
+    # print(pkX,X[left_min],X[right_min])
+    return pkX, X[left_min], X[right_min]
+
+
+@jit(nopython=True)
+def sort_dots(ds: np.ndarray, left: np.ndarray, right: np.ndarray) -> list:
+    mask = (ds[:, None] >= left) & (ds[:, None] <= right)
+    return [ds[m] for m in mask.T]
+
+
+def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray) -> (np.ndarray, np.ndarray, bool):
     """
     input - arr_1, arr_2 - two np.ndarray, possibly not equal size
     return - tuple with two arrays (long, short)
@@ -411,7 +557,7 @@ def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray):
         return arr_2, arr_1, False
 
 
-def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool):
+def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool) -> (Dataset, Dataset):
     """
     input - arr_long - bigger Dataset, arr_short - smaller Dataset with mz and int data
     return - tuple with two arrays of equal size (optional slice for bigger dataset)
@@ -432,7 +578,7 @@ def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool):
         return arr_short, opt_long
 
 
-def get_index(dataset: np.ndarray, ds_id: int):
+def get_index(dataset: np.ndarray, ds_id: int) -> np.ndarray:
     """
     input - dataset - np.ndarray with full recorded data from attached HDF file
           - ds_id - int with id of dataset column
@@ -442,7 +588,7 @@ def get_index(dataset: np.ndarray, ds_id: int):
     return np.where(index_data == ds_id)
 
 
-def verify_datasets(data_1: Dataset, data_2: Dataset, threshold=1.0):
+def verify_datasets(data_1: LinkedList, data_2: LinkedList, threshold=1.0) -> (LinkedList, LinkedList):
     """
     input - data_1, data_2 - Dataset objects which need to be verified
           - threshold - int with maximum distance between values in data_1 and data_2 with one index
@@ -455,21 +601,23 @@ def verify_datasets(data_1: Dataset, data_2: Dataset, threshold=1.0):
         data2_new = data_2
 
     dist_array = data1_new - data2_new
+    if threshold == 'dist_based':
+        threshold = np.mean(dist_array)
     score_fit = np.max(np.abs(dist_array))
 
     if score_fit > threshold:
         cut_index = np.array([np.where(np.abs(dist_array) >= threshold)]).min()
         if data1_new[cut_index] < data2_new[cut_index]:
-            data1_new2 = np.delete(data1_new, cut_index)
+            data1_new2 = data1_new.sync_delete(cut_index)
             data2_new2 = data2_new
         else:
-            data2_new2 = np.delete(data2_new, cut_index)
+            data2_new2 = data2_new.sync_delete(cut_index)
             data1_new2 = data1_new
         return get_opt_strip(*get_long_and_short(data1_new2, data2_new2))
     return data1_new, data2_new
 
 
-def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0):
+def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0) -> [float, float]:
     """
     input - dataset - Dataset object
           - approx_mz - float with initial guess for ref peak location
@@ -540,26 +688,85 @@ def prepare_array(distances):
     return sorted
 
 
+# вычислить среднее и дисперсии, проверить нормальность, проверить гипотезы о значимости различия средних и дисперсий, возможно посчитать форму распределения
+def stat_params_paired(ds_raw, ds_aln, p_value=0.05):
+    mean_r, mean_a = np.mean(ds_raw), np.mean(ds_aln)
+    var_r, var_a = np.var(ds_raw), np.var(ds_aln)
+
+    neq_mean, neq_var = np.nan, np.nan
+    check_normal = (stats.shapiro(ds_raw)[1] > p_value) & (stats.shapiro(ds_aln)[1] > p_value)
+    if check_normal:
+        neq_var = stats.levene(ds_raw, ds_aln)[1] < p_value
+        neq_mean = stats.ttest_rel(ds_raw, ds_aln)[1] < p_value
+
+    return mean_r - mean_a, var_r - var_a, neq_mean, neq_var
+
+
+def stat_params_unpaired(ds):
+    res = np.array([[np.var(dot), dipstat(dot), stats.skew(dot), stats.kurtosis(dot)] for dot in ds])
+    return res
+
+
+
 '''process main function'''
 
 
 def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
-    P = 0.05
+    #epsilon = 5*10**-5
     try:
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV, limit=100)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV, limit=10)
 
         distance_list_prepared = prepare_array(distance_list)
         raw_concat, aln_concat, id_concat = distance_list_prepared
 
-        kde_x_raw, kde_y_raw = FFTKDE(bw=BW).fit(raw_concat).evaluate(N_DOTS)
-        kde_x_aln, kde_y_aln = FFTKDE(bw=BW).fit(aln_concat).evaluate(N_DOTS)
-        return ((kde_x_raw, kde_y_raw), 'raw', 'red'), ((kde_x_aln, kde_y_aln), 'aln', 'blue')
+        kde_x_raw, kde_y_raw = FFTKDE(bw=BW, kernel='gaussian').fit(raw_concat).evaluate(N_DOTS)
+        kde_x_aln, kde_y_aln = FFTKDE(bw=BW, kernel='gaussian').fit(aln_concat).evaluate(N_DOTS)
+
+        epsilon = np.max(kde_y_raw) * 0.01
+
+        center_r, left_r, right_r = peak_picking(kde_x_raw, kde_y_raw)
+        center_a, left_a, right_a = peak_picking(kde_x_aln, kde_y_aln)
+        # восстановим высоту пиков
+        max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
+                                                                                          kde_y_aln)
+
+        # print(max_center_r,max_center_a)
+
+        borders_r = np.stack((left_r, right_r), axis=1)
+        borders_a = np.stack((left_a, right_a), axis=1)
+        # print('borders_r')
+        # print(borders_r)
+        c_ds_raw = LinkedList(center_r, borders_r).sync_delete(np.where(max_center_r <= epsilon)[0])
+        c_ds_aln = LinkedList(center_a, borders_a).sync_delete(np.where(max_center_a <= epsilon)[0])
+
+        # print('c_ds_raw.linked_array')
+        # print(c_ds_raw.linked_array)
+        peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
+        peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
+        print(len(peak_lists_raw))
+        print(len(peak_lists_aln))
+
+        # peak_lists_raw = sort_dots(raw_concat,left_r,right_r)
+        # peak_lists_aln = sort_dots(aln_concat,left_a,right_a)
+        # statistics = [stat_params(peak_lists_raw[i],peak_lists_aln[i]) for i in range(len(peak_lists_raw))]
+
+        ret = (
+            ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p'),
+                      ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p'),
+                      (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln'),
+                      (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln'))),
+            ('stats', (stat_params_unpaired(peak_lists_raw), stat_params_paired(peak_lists_aln))),
+        )
+        return ret
 
     except Exception as e:
         print(e)
 
+
+def calc_stat_process(SHARED_MEM):
+    print(SHARED_MEM)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
