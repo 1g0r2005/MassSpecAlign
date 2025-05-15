@@ -1,5 +1,4 @@
 import math
-import math
 import sys
 from multiprocessing import Process, Queue
 from pathlib import Path
@@ -16,7 +15,7 @@ from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
     QFormLayout, QFileDialog
-from diptest import dipstat
+from diptest import diptest
 from numba import jit
 from tqdm import tqdm
 
@@ -235,8 +234,11 @@ class MainWindow(QMainWindow):
         self.main = MainPage(self, 'Main')
         self.tabs.addTab(self.main, self.main.title)
 
-        self.graph = GraphPage(self, x_label='m/z', y_label='dens', title='Plot')
+        self.graph = GraphPage(self, x_labels=['m/z'], y_labels=['dens'], title='KDE', title_plots=('kde',))
         self.tabs.addTab(self.graph, self.graph.title)
+
+        self.stats = StatGraphPage(self, title='Statistics')
+        self.tabs.addTab(self.stats, self.stats.title)
 
         self.signals = WorkerSignals()
         self.manager = ProcessManager(self.signals)
@@ -251,7 +253,7 @@ class MainWindow(QMainWindow):
         self.signals.result.connect(self.redirect_outputs)
 
     def redirect_outputs(self, ret):
-        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stat.show}
+        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stats.add_plot_mul}
         for output in ret:
             self.aval_func[output[0]](output[1])
 
@@ -391,52 +393,9 @@ class MainPage(QWidget):
                                                                self.const.N_DOTS
                                                                ))
 
-
 class GraphPage(QWidget):
-
-    def __init__(self, parent, title='PlotPage', title_plot='plot', x_label='x', y_label='y', color=(255, 255, 255),
-                 bg_color=(0, 0, 0)):
-
-        super().__init__()
-        self.parent = parent
-        self.title = title
-        self.plot_space = pg.PlotWidget()
-        self.plot_space.setTitle(self.title)
-        self.plot_space.setBackground(bg_color)
-        self.plot_space.showGrid(x=True, y=True)
-        self.layout = QtWidgets.QHBoxLayout()
-        self.setLayout(self.layout)
-        self.layout.addWidget(self.plot_space)
-
-    def add_plot(self, data, plot_name, color):
-        pen = pg.mkPen(color=color)
-        self.plot_space.plot(data[0], data[1], name=plot_name, pen=pen)
-
-    def add_line(self, data, y_max, color):
-        pen = pg.mkPen(color=color, style=QtCore.Qt.DashLine)
-        y_min = 0
-        x = np.column_stack([data,
-                             data,
-                             np.full_like(data, np.nan)]).ravel()
-        y = np.column_stack([np.full_like(data, y_min),
-                             np.full_like(data, y_max),
-                             np.full_like(data, np.nan)]).ravel()
-        self.plot_space.plot(x, y, pen=pen)
-        #self.plot_space.addItem(pg.InfiniteLine(pos=x,angle=90,pen=pen,movable=False))
-
-    def add_plot_mul(self, ds):
-        #print(ds)
-        for data in ds:
-            if data[-1] == 'p':
-                self.add_plot(data[0], data[1], data[2])
-            elif data[-1] == 'vln':
-                self.add_line(data[0], data[1], data[3])
-
-
-class GraphPageMul(QWidget):
     def __init__(self, parent, canvas_count=1, title='PlotPage', title_plots=None, x_labels=None, y_labels=None,
-                 color=(255, 255, 255),
-                 bg_color=(0, 0, 0)):
+                 color=(255, 255, 255), bg_color=(0, 0, 0)):
         super().__init__()
 
         if x_labels is None: x_labels = ['x'] * canvas_count
@@ -454,17 +413,20 @@ class GraphPageMul(QWidget):
             self.plot_spaces[i].showGrid(x=True, y=True)
             self.plot_spaces[i].setTitle(title_plots[i])
             self.layout.addWidget(self.plot_spaces[i])
+            self.plot_spaces[i].setLabel('bottom', x_labels[i])
+            self.plot_spaces[i].setLabel('left', y_labels[i])
 
-        def add_plot(self, data, plot_name, color, canvas_name=None):
-            if canvas_name is None:
-                plot_id = 0
-            else:
-                plot_id = self.canvas_adj[canvas_name]
+    def add_plot(self, data, plot_name, color, canvas_name=None):
+        if canvas_name is None:
+            plot_id = 0
+        else:
+            plot_id = self.canvas_adj[canvas_name]
+        pen = pg.mkPen(color=color)
+        self.plot_spaces[plot_id].plot(data[0], data[1], name=plot_name, pen=pen)
+        self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
 
-            pen = pg.mkPen(color=color)
-            self.plot_spaces[plot_id].plot(data[0], data[1], name=plot_name, pen=pen)
-
-        def add_line(self, data, y_max, color, canvas_name=None):
+    def add_line(self, data, y_max, color, canvas_name=None):
+        try:
             if canvas_name is None:
                 plot_id = 0
             else:
@@ -479,15 +441,73 @@ class GraphPageMul(QWidget):
                                  np.full_like(data, y_max),
                                  np.full_like(data, np.nan)]).ravel()
             self.plot_spaces[plot_id].plot(x, y, pen=pen)
+            self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
+        except Exception as e:
+            print(e)
             # self.plot_space.addItem(pg.InfiniteLine(pos=x,angle=90,pen=pen,movable=False))
 
-        def add_plot_mul(self, ds):
-            # print(ds)
-            for data in ds:
-                if data[-1] == 'p':
-                    self.add_plot(data[0], data[1], data[2], data[-1])
-                elif data[-1] == 'vln':
-                    self.add_line(data[0], data[1], data[3], data[-1])
+    def add_plot_mul(self, ds):
+        # print(ds)
+        for data in ds:
+            if data[-2] == 'p':
+                self.add_plot(data[0], data[1], data[2], data[-1])
+            elif data[-2] == 'vln':
+                self.add_line(data[0], data[1], data[3], data[-1])
+
+
+class StatGraphPage(GraphPage):
+    def __init__(self, parent, title='StatPage', x_labels=None, y_labels=None,
+                 color=(255, 255, 255), bg_color=(0, 0, 0), p_val=0.05):
+        super().__init__(parent, canvas_count=4, title=title, title_plots=('DEV', 'MOD', 'SKEW', 'KURT'),
+                         x_labels=x_labels, y_labels=y_labels, color=color, bg_color=bg_color)
+
+        self.table = pg.TableWidget()  # сколько всего точек, медианное отклонение, число точек не мономодальных
+        self.p = p_val
+        self.table_data = np.zeros((3, 2))
+
+        self.layout.setStretch(0, 1)  # Виджет 1
+        self.layout.setStretch(1, 1)  # Виджет 2
+        self.layout.setStretch(2, 1)  # Виджет 3
+        self.layout.setStretch(3, 1)
+        self.layout.addWidget(self.table)
+
+    def add_plot_mul(self, ds):
+        self.fixed_colors = [
+            pg.mkColor('blue'),  # Синий
+            pg.mkColor('red'),  # Красный
+            pg.mkColor('green'),  # Зеленый
+            pg.mkColor('yellow'),  # Желтый
+            pg.mkColor('purple'),  # Фиолетовый
+            pg.mkColor('cyan'),  # Голубой
+        ]
+        for n in range(len(ds)):
+            data = ds[n]
+            ds_color = self.fixed_colors[n]
+
+            self.table_data[0, n] = len(data[0])
+
+            self.add_plot(data[0], f'st_dev_{n}', ds_color, 'DEV')
+            self.add_plot(data[1], f'dip_{n}', ds_color, 'MOD')
+            self.add_plot(data[3], f'skew_{n}', ds_color, 'SKEW')
+            self.add_plot(data[4], f'kurt_{n}', ds_color, 'KURT')
+            self.table_data[1, n] = np.where(data[2] < self.p)[0].size
+            self.table_data[2, n] = np.median(data[0])
+        self.table.setData(self.table_data)
+        self.table.setHorizontalHeaderLabels([str(i) for i in range(len(ds))])
+        self.table.setVerticalHeaderLabels(['Total', 'Multimodal?', 'Median std dev'])
+
+    def add_plot(self, data, plot_name, color, canvas_name=None):
+        if canvas_name is None:
+            plot_id = 0
+        else:
+            plot_id = self.canvas_adj[canvas_name]
+        pen = pg.mkPen(color=color)
+        no_nan = lambda arr: arr[~np.isnan(arr)]
+        y, x = np.histogram(no_nan(data), bins=60)
+
+        self.plot_spaces[plot_id].plot(x, y, stepMode=True, name=plot_name, pen=pen)
+        self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
+
 
 
 
@@ -703,7 +723,7 @@ def stat_params_paired(ds_raw, ds_aln, p_value=0.05):
 
 
 def stat_params_unpaired(ds):
-    res = np.array([[np.var(dot), dipstat(dot), stats.skew(dot), stats.kurtosis(dot)] for dot in ds])
+    res = np.array([[np.var(dot), *diptest(dot), stats.skew(dot), stats.kurtosis(dot)] for dot in ds])
     return res
 
 
@@ -716,7 +736,7 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
     try:
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV, limit=10)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV)
 
         distance_list_prepared = prepare_array(distance_list)
         raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -743,6 +763,7 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
 
         # print('c_ds_raw.linked_array')
         # print(c_ds_raw.linked_array)
+
         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
         peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
         print(len(peak_lists_raw))
@@ -753,20 +774,17 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
         # statistics = [stat_params(peak_lists_raw[i],peak_lists_aln[i]) for i in range(len(peak_lists_raw))]
 
         ret = (
-            ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p'),
-                      ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p'),
-                      (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln'),
-                      (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln'))),
-            ('stats', (stat_params_unpaired(peak_lists_raw), stat_params_paired(peak_lists_aln))),
+            ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
+                      ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
+                      (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
+                      (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
+            ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
         )
         return ret
 
     except Exception as e:
         print(e)
 
-
-def calc_stat_process(SHARED_MEM):
-    print(SHARED_MEM)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

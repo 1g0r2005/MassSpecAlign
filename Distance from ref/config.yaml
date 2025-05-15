@@ -7,6 +7,6 @@ CASH: !!str Cash\\cash.hdf5
 DATASET: !!str roi2_e033/00/features
 REF: !!float 193.07712
 DEV: !!float 1
-BW: !!float 0.2
+BW: !!float 0.01
 NDOTS: !!int 100000
 ...
