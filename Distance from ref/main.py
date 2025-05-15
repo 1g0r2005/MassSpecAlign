@@ -736,7 +736,7 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
     try:
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV, limit=1000)
 
         distance_list_prepared = prepare_array(distance_list)
         raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -761,8 +761,7 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
         c_ds_raw = LinkedList(center_r, borders_r).sync_delete(np.where(max_center_r <= epsilon)[0])
         c_ds_aln = LinkedList(center_a, borders_a).sync_delete(np.where(max_center_a <= epsilon)[0])
 
-        # print('c_ds_raw.linked_array')
-        # print(c_ds_raw.linked_array)
+        nc_ds_raw, c_ds_aln = verify_datasets(c_ds_raw, c_ds_aln, np.median(abs(c_ds_raw - c_ds_aln)))
 
         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
         peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
