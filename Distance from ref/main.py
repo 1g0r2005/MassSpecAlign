@@ -761,7 +761,7 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
         c_ds_raw = LinkedList(center_r, borders_r).sync_delete(np.where(max_center_r <= epsilon)[0])
         c_ds_aln = LinkedList(center_a, borders_a).sync_delete(np.where(max_center_a <= epsilon)[0])
 
-        nc_ds_raw, c_ds_aln = verify_datasets(c_ds_raw, c_ds_aln, np.median(abs(c_ds_raw - c_ds_aln)))
+        # c_ds_raw, c_ds_aln = verify_datasets(c_ds_raw, c_ds_aln, np.median(abs(c_ds_raw - c_ds_aln)))
 
         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
         peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
