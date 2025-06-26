@@ -1,3 +1,4 @@
+import copy
 import math
 import sys
 from multiprocessing import Process, Queue
@@ -18,6 +19,8 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabe
 from diptest import diptest
 from numba import jit
 from tqdm import tqdm
+
+import hungarian
 
 """classes declaration"""
 
@@ -707,7 +710,6 @@ def prepare_array(distances):
     sorted = pre_sorted[:, pre_sorted[0].argsort()]
     return sorted
 
-
 # вычислить среднее и дисперсии, проверить нормальность, проверить гипотезы о значимости различия средних и дисперсий, возможно посчитать форму распределения
 def stat_params_paired(ds_raw, ds_aln, p_value=0.05):
     mean_r, mean_a = np.mean(ds_raw), np.mean(ds_aln)
@@ -727,16 +729,44 @@ def stat_params_unpaired(ds):
     return res
 
 
+def moving_average(a, n=2):
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1:] / n
+
+
+def out_criteria(arr, inten):
+    min_int = np.max(inten) * 0.01
+    max_diff = 0.3
+    width_eps = 0.3
+    first_or = inten < min_int
+    int_criteria = abs(inten[:-1] / inten[1:] - 1) < max_diff
+
+    width_criteria = np.diff(arr) / moving_average(np.diff(arr.linked_array).flatten()) <= width_eps
+    print(int_criteria.shape, width_criteria.shape)
+    second_or = np.full(arr.shape, False)
+    second_or[1:] = np.logical_and(int_criteria, width_criteria)
+
+    return np.where(np.logical_or(first_or, second_or))[0]
+
+
+def criteria_apply(arr, inten):
+    arr_out = copy.deepcopy(arr)
+    indexes = out_criteria(arr, inten)
+    for index in indexes:
+        arr_out.linked_array[index - 1] = sorted([arr.linked_array[index - 1, 0], arr.linked_array[index, 1]])
+
+    return arr_out.sync_delete(indexes)
+
 
 '''process main function'''
 
 
 def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
     #epsilon = 5*10**-5
-    try:
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV, limit=1000)
+    distance_list = read_dataset(features_raw, features_aln, REF, DEV)
 
         distance_list_prepared = prepare_array(distance_list)
         raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -752,16 +782,17 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
         max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
                                                                                           kde_y_aln)
 
-        # print(max_center_r,max_center_a)
+    # print(max_center_r,max_center_a)
 
         borders_r = np.stack((left_r, right_r), axis=1)
         borders_a = np.stack((left_a, right_a), axis=1)
         # print('borders_r')
         # print(borders_r)
-        c_ds_raw = LinkedList(center_r, borders_r).sync_delete(np.where(max_center_r <= epsilon)[0])
-        c_ds_aln = LinkedList(center_a, borders_a).sync_delete(np.where(max_center_a <= epsilon)[0])
+    ds_raw = LinkedList(center_r, borders_r)  # .sync_delete(np.where(max_center_r <= epsilon)[0])
+    ds_aln = LinkedList(center_a, borders_a)  # .sync_delete(np.where(max_center_a <= epsilon)[0])
 
-        # c_ds_raw, c_ds_aln = verify_datasets(c_ds_raw, c_ds_aln, np.median(abs(c_ds_raw - c_ds_aln)))
+    c_ds_raw, c_ds_aln = criteria_apply(ds_raw, max_center_r), criteria_apply(ds_aln, max_center_a)
+
 
         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
         peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
@@ -779,11 +810,14 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
                       (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
             ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
         )
+
         return ret
 
-    except Exception as e:
-        print(e)
 
+'''
+except Exception as e:
+    print(e)
+'''
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
