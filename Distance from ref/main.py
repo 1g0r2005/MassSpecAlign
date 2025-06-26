@@ -14,13 +14,11 @@ from IPython.external.qt_for_kernel import QtCore
 from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
+from PyQt5.QtWidgets import QMainWindow, QWidget, QLineEdit, QLabel, QPushButton, \
     QFormLayout, QFileDialog
 from diptest import diptest
 from numba import jit
 from tqdm import tqdm
-
-import hungarian
 
 """classes declaration"""
 
