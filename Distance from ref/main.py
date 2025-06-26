@@ -14,7 +14,7 @@ from IPython.external.qt_for_kernel import QtCore
 from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal
-from PyQt5.QtWidgets import QMainWindow, QWidget, QLineEdit, QLabel, QPushButton, \
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
     QFormLayout, QFileDialog
 from diptest import diptest
 from numba import jit
@@ -748,11 +748,11 @@ def out_criteria(arr, inten):
     return np.where(np.logical_or(first_or, second_or))[0]
 
 
-def criteria_apply(arr, inten):
+def criteria_apply(arr,inten):
     arr_out = copy.deepcopy(arr)
-    indexes = out_criteria(arr, inten)
+    indexes = out_criteria(arr,inten)
     for index in indexes:
-        arr_out.linked_array[index - 1] = sorted([arr.linked_array[index - 1, 0], arr.linked_array[index, 1]])
+        arr_out.linked_array[index-1] = sorted([arr.linked_array[index-1,0],arr.linked_array[index,1]])
 
     return arr_out.sync_delete(indexes)
 
@@ -761,10 +761,10 @@ def criteria_apply(arr, inten):
 
 
 def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
-    #epsilon = 5*10**-5
+        #epsilon = 5*10**-5
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-    distance_list = read_dataset(features_raw, features_aln, REF, DEV)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV)
 
         distance_list_prepared = prepare_array(distance_list)
         raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -780,16 +780,17 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
         max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
                                                                                           kde_y_aln)
 
-    # print(max_center_r,max_center_a)
+
+        # print(max_center_r,max_center_a)
 
         borders_r = np.stack((left_r, right_r), axis=1)
         borders_a = np.stack((left_a, right_a), axis=1)
         # print('borders_r')
         # print(borders_r)
-    ds_raw = LinkedList(center_r, borders_r)  # .sync_delete(np.where(max_center_r <= epsilon)[0])
-    ds_aln = LinkedList(center_a, borders_a)  # .sync_delete(np.where(max_center_a <= epsilon)[0])
+        ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
+        ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
 
-    c_ds_raw, c_ds_aln = criteria_apply(ds_raw, max_center_r), criteria_apply(ds_aln, max_center_a)
+        c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
 
 
         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
