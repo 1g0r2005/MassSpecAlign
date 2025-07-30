@@ -4,7 +4,7 @@ import sys
 from multiprocessing import Process, Queue
 from pathlib import Path
 from queue import Empty
-
+import aligment
 import h5py
 import numpy as np
 import pyqtgraph as pg
@@ -15,10 +15,11 @@ from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
-    QFormLayout, QFileDialog
+    QFormLayout, QFileDialog, QAbstractItemView, QHeaderView, QTableWidgetItem
 from diptest import diptest
 from numba import jit
 from tqdm import tqdm
+
 
 """classes declaration"""
 
@@ -102,7 +103,6 @@ class ProcessManager:
         while not self.return_q.empty():
             try:
                 func_name, content = self.return_q.get_nowait()
-                print('return from {}'.format(func_name))
                 self.signals.result.emit(content)
             except Empty:
                 break
@@ -113,7 +113,6 @@ class ProcessManager:
         while not self.error_q.empty():
             try:
                 msg = self.error_q.get_nowait()
-                # print(msg, end='')
                 self.signals.error.emit(str(msg))
             except Empty:
                 break
@@ -238,8 +237,9 @@ class MainWindow(QMainWindow):
         self.graph = GraphPage(self, x_labels=['m/z'], y_labels=['dens'], title='KDE', title_plots=('kde',))
         self.tabs.addTab(self.graph, self.graph.title)
 
-        self.stats = StatGraphPage(self, title='Statistics')
+        self.stats = StatGraphPage(self, title='Statistics(Unpaired)')
         self.tabs.addTab(self.stats, self.stats.title)
+
 
         self.signals = WorkerSignals()
         self.manager = ProcessManager(self.signals)
@@ -462,7 +462,10 @@ class StatGraphPage(GraphPage):
         super().__init__(parent, canvas_count=4, title=title, title_plots=('DEV', 'MOD', 'SKEW', 'KURT'),
                          x_labels=x_labels, y_labels=y_labels, color=color, bg_color=bg_color)
 
-        self.table = pg.TableWidget()  # сколько всего точек, медианное отклонение, число точек не мономодальных
+        self.table_p = pg.TableWidget()
+        self.table_un = pg.TableWidget()  # сколько всего точек, медианное отклонение, число точек не мономодальных
+        self.table_list = {'paired': self.table_p,'unpaired': self.table_un}
+
         self.p = p_val
         self.table_data = np.zeros((3, 2))
 
@@ -470,7 +473,19 @@ class StatGraphPage(GraphPage):
         self.layout.setStretch(1, 1)  # Виджет 2
         self.layout.setStretch(2, 1)  # Виджет 3
         self.layout.setStretch(3, 1)
-        self.layout.addWidget(self.table)
+
+        self.table_layout = QtWidgets.QHBoxLayout()
+        self.layout.addLayout(self.table_layout)
+        self.table_layout.addWidget(self.table_un)
+        self.table_layout.addWidget(self.table_p)
+    def add_row(self,table_name,data):
+        row_index = self.table_data[table_name].rowCount()
+        self.table_data[table_name].insertRow(row_index)
+        for col,value in enumerate(data):
+            self.table_data[table_name].setItem(row_index, col, QTableWidgetItem(str(value)))
+    def add_data(self,table_name,data):
+        for line in data:
+            self.add_row(table_name,line)
 
     def add_plot_mul(self, ds):
         self.fixed_colors = [
@@ -493,9 +508,9 @@ class StatGraphPage(GraphPage):
             self.add_plot(data[4], f'kurt_{n}', ds_color, 'KURT')
             self.table_data[1, n] = np.where(data[2] < self.p)[0].size
             self.table_data[2, n] = np.median(data[0])
-        self.table.setData(self.table_data)
-        self.table.setHorizontalHeaderLabels([str(i) for i in range(len(ds))])
-        self.table.setVerticalHeaderLabels(['Total', 'Multimodal?', 'Median std dev'])
+        self.table_un.setData(self.table_data)
+        self.table_un.setHorizontalHeaderLabels([str(i) for i in range(len(ds))])
+        self.table_un.setVerticalHeaderLabels(['total', 'is multimodal', 'median std dev'])
 
     def add_plot(self, data, plot_name, color, canvas_name=None):
         if canvas_name is None:
@@ -714,12 +729,14 @@ def stat_params_paired(ds_raw, ds_aln, p_value=0.05):
     var_r, var_a = np.var(ds_raw), np.var(ds_aln)
 
     neq_mean, neq_var = np.nan, np.nan
-    check_normal = (stats.shapiro(ds_raw)[1] > p_value) & (stats.shapiro(ds_aln)[1] > p_value)
+    #kstest(data, 'norm', args=(np.mean(data), np.std(data)))
+    check_normal_func = lambda data,p: stats.kstest(data,'norm',args=(np.mean(data),np.std(data)))[1]>p
+    check_normal = check_normal_func(ds_raw,p_value) & check_normal_func(ds_aln,p_value)
     if check_normal:
         neq_var = stats.levene(ds_raw, ds_aln)[1] < p_value
-        neq_mean = stats.ttest_rel(ds_raw, ds_aln)[1] < p_value
+        neq_mean = stats.ttest_ind(ds_raw, ds_aln,nan_policy='omit')[1] < p_value
 
-    return mean_r - mean_a, var_r - var_a, neq_mean, neq_var
+    return mean_r - mean_a, var_r - var_a,check_normal, neq_mean, neq_var
 
 
 def stat_params_unpaired(ds):
@@ -741,7 +758,7 @@ def out_criteria(arr, inten):
     int_criteria = abs(inten[:-1] / inten[1:] - 1) < max_diff
 
     width_criteria = np.diff(arr) / moving_average(np.diff(arr.linked_array).flatten()) <= width_eps
-    print(int_criteria.shape, width_criteria.shape)
+    #print(int_criteria.shape, width_criteria.shape)
     second_or = np.full(arr.shape, False)
     second_or[1:] = np.logical_and(int_criteria, width_criteria)
 
@@ -761,10 +778,9 @@ def criteria_apply(arr,inten):
 
 
 def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
-        #epsilon = 5*10**-5
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV,limit = 100)
 
         distance_list_prepared = prepare_array(distance_list)
         raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -780,27 +796,22 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
         max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
                                                                                           kde_y_aln)
 
-
-        # print(max_center_r,max_center_a)
-
         borders_r = np.stack((left_r, right_r), axis=1)
         borders_a = np.stack((left_a, right_a), axis=1)
-        # print('borders_r')
-        # print(borders_r)
         ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
         ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
 
         c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
 
-
         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
         peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
-        print(len(peak_lists_raw))
-        print(len(peak_lists_aln))
 
-        # peak_lists_raw = sort_dots(raw_concat,left_r,right_r)
-        # peak_lists_aln = sort_dots(aln_concat,left_a,right_a)
-        # statistics = [stat_params(peak_lists_raw[i],peak_lists_aln[i]) for i in range(len(peak_lists_raw))]
+        aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw[0], peak_lists_aln[0])
+        print(len(aln_peak_lists_raw),len(aln_peak_lists_aln))
+
+        s_p = np.array([stat_params_paired(x_el,y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],dtype='object').T
+        print(s_p)
+        s_p_names = np.array(['d_mean','d_var','is normal','eq_mean','eq_var'])
 
         ret = (
             ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
@@ -808,15 +819,10 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
                       (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
                       (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
             ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
+            ('stats_paired',(s_p, s_p_names))
         )
 
         return ret
-
-
-'''
-except Exception as e:
-    print(e)
-'''
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
