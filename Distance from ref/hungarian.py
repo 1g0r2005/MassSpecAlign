@@ -1,11 +1,10 @@
-"""
-набор данных - np.ndarray([100,150,200,500,680,700])   np.ndarray([106,144,203,495,705])
-"""
-
 import numpy as np
 from munkres import Munkres
 
-def munkres_align(x,y):
+
+def munkres_align(x_arr,y_arr):
+    convert = lambda arr: np.array([np.array(el).mean() for el in arr])
+    x, y = convert(x_arr), convert(y_arr)
     x_len,y_len = len(x),len(y)
     x_n,y_n = __equal_size(x,y)
     matrix = __make_matrix(x_n,y_n)
@@ -15,13 +14,15 @@ def munkres_align(x,y):
     condition = (indexes[:, 0] < x_len) & (indexes[:, 1] < y_len)
     return x[indexes[condition][:,0]],y[indexes[condition][:,1]]
 
-def __w(x, y, k = 20, threshold = 10, epsilon = 1):
+def __w(x:np.ndarray, y:np.ndarray, k = 20, threshold = 10, epsilon = 1):
     dist = abs(x - y)
     dist_norm =  np.tanh(dist/k)
+    print(f'from hungarian: __w: {dist_norm}')
     return dist_norm
 
 def __make_matrix(x,y):
     matrix =  __w(x[:, np.newaxis], y[np.newaxis, :])
+    print('matrix_created')
     return matrix
 
 def __equal_size(x,y):
