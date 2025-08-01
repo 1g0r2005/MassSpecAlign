@@ -15,7 +15,7 @@ from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
-    QFormLayout, QFileDialog, QAbstractItemView, QHeaderView, QTableWidgetItem
+    QFormLayout, QFileDialog, QTableWidgetItem
 from diptest import diptest
 from numba import jit
 from tqdm import tqdm
@@ -186,7 +186,7 @@ class File:
         return self.real_path.exists()
 
     def read(self, dataset):
-        try:
+        try:# TODO: add regex for more flexible input
             with h5py.File(self.real_path, 'r') as f:
                 if dataset in f:
                     data = f[dataset][:]
@@ -240,6 +240,9 @@ class MainWindow(QMainWindow):
         self.stats = StatGraphPage(self, title='Statistics(Unpaired)')
         self.tabs.addTab(self.stats, self.stats.title)
 
+        self.stats_p = StatGraphPage(self, title='Statistics(Paired)')
+        self.tabs.addTab(self.stats_p, self.stats_p.title)
+
 
         self.signals = WorkerSignals()
         self.manager = ProcessManager(self.signals)
@@ -254,7 +257,7 @@ class MainWindow(QMainWindow):
         self.signals.result.connect(self.redirect_outputs)
 
     def redirect_outputs(self, ret):
-        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stats.add_plot_mul}
+        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stats.add_plot_mul, 'stats_p': self.stats_p.add_plot_mul}
         for output in ret:
             self.aval_func[output[0]](output[1])
 
@@ -679,14 +682,17 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, lim
           - limit - maximum number of mass spectra to be processed (for debugging use only, otherwise should be zero)
     return - (void function)
     """
-    if limit is None:
-        set_num = int(max(dataset_raw[0])) + 1
-    else:
-        set_num = int(limit)
+    start_index, end_index = int(min(dataset_raw[0])), int(max(dataset_raw[0]))
+    print(start_index)
+    if limit is not None:
+        if start_index + limit <= end_index:
+            end_index = start_index + limit
+
+    set_num = end_index - start_index + 1
 
     dataset_list = np.empty((2, set_num), dtype=Dataset)
 
-    for index in tqdm(range(set_num), desc='Прогресс'):
+    for index in tqdm(range(start_index,end_index+1), desc='Прогресс'):
         index_raw, index_aln = get_index(dataset_raw, index), get_index(dataset_aln, index)
 
         data_raw_unsorted = dataset_raw[1:3, index_raw[0][0]:index_raw[0][-1] + 1]
@@ -724,19 +730,25 @@ def prepare_array(distances):
     return sorted
 
 # вычислить среднее и дисперсии, проверить нормальность, проверить гипотезы о значимости различия средних и дисперсий, возможно посчитать форму распределения
-def stat_params_paired(ds_raw, ds_aln, p_value=0.05):
-    mean_r, mean_a = np.mean(ds_raw), np.mean(ds_aln)
-    var_r, var_a = np.var(ds_raw), np.var(ds_aln)
+def stat_params_paired_single(peak_raw, peak_aln, p_value=0.05):
+    """paired peak comparison"""
+
+    norm_var = lambda data: np.var(data-np.mean(data),ddof=1)
+    mean_r, mean_a = np.mean(peak_raw), np.mean(peak_aln)
+    var_r, var_a = norm_var(peak_raw), norm_var(peak_aln)
 
     neq_mean, neq_var = np.nan, np.nan
     #kstest(data, 'norm', args=(np.mean(data), np.std(data)))
     check_normal_func = lambda data,p: stats.kstest(data,'norm',args=(np.mean(data),np.std(data)))[1]>p
-    check_normal = check_normal_func(ds_raw,p_value) & check_normal_func(ds_aln,p_value)
+    check_normal = check_normal_func(peak_raw,p_value) & check_normal_func(peak_aln,p_value)
     if check_normal:
-        neq_var = stats.levene(ds_raw, ds_aln)[1] < p_value
-        neq_mean = stats.ttest_ind(ds_raw, ds_aln,nan_policy='omit')[1] < p_value
+        neq_var = stats.levene(peak_raw, peak_aln)[1] < p_value
+        neq_mean = stats.ttest_ind(peak_raw, peak_aln,nan_policy='omit')[1] < p_value
 
-    return mean_r - mean_a, var_r - var_a,check_normal, neq_mean, neq_var
+    return mean_r - mean_a, var_r - var_a,var_r,var_a,check_normal, neq_mean, neq_var
+
+def stat_params_paired(ds_raw,ds_aln,p_value=0.05):
+    pass
 
 
 def stat_params_unpaired(ds):
@@ -750,7 +762,7 @@ def moving_average(a, n=2):
     return ret[n - 1:] / n
 
 
-def out_criteria(arr, inten):
+def out_criteria(arr, inten):# TODO: add documentation (see TG for descr.)
     min_int = np.max(inten) * 0.01
     max_diff = 0.3
     width_eps = 0.3
@@ -780,7 +792,7 @@ def criteria_apply(arr,inten):
 def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV,limit = 100)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV)
 
         distance_list_prepared = prepare_array(distance_list)
         raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -806,11 +818,10 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
         peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-        aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw[0], peak_lists_aln[0])
-        print(len(aln_peak_lists_raw),len(aln_peak_lists_aln))
+        aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln)
 
-        s_p = np.array([stat_params_paired(x_el,y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],dtype='object').T
-        print(s_p)
+        s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object').T
+
         s_p_names = np.array(['d_mean','d_var','is normal','eq_mean','eq_var'])
 
         ret = (
@@ -819,7 +830,7 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
                       (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
                       (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
             ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
-            ('stats_paired',(s_p, s_p_names))
+            ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T))
         )
 
         return ret
