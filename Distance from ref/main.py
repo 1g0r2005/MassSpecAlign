@@ -4,7 +4,7 @@ import sys
 from multiprocessing import Process, Queue
 from pathlib import Path
 from queue import Empty
-import aligment
+
 import h5py
 import numpy as np
 import pyqtgraph as pg
@@ -13,13 +13,14 @@ import yaml
 from IPython.external.qt_for_kernel import QtCore
 from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import QTimer, QObject, pyqtSignal
+from PyQt5.QtCore import QTimer, QObject, pyqtSignal, Qt
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
-    QFormLayout, QFileDialog, QTableWidgetItem
+    QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter
 from diptest import diptest
 from numba import jit
 from tqdm import tqdm
 
+import aligment
 
 """classes declaration"""
 
@@ -243,7 +244,11 @@ class MainWindow(QMainWindow):
         self.stats_p = StatGraphPage(self, title='Statistics(Paired)')
         self.tabs.addTab(self.stats_p, self.stats_p.title)
 
+        self.table = TablePage(self,title ='Stat per peak',columns=6)
+        self.tabs.addTab(self.table, self.table.title)
 
+
+        self.table.set_title(['distance','var(raw)','var(aln)','is normal distributed?','neq_mean?','neq_var?'])
         self.signals = WorkerSignals()
         self.manager = ProcessManager(self.signals)
 
@@ -257,7 +262,7 @@ class MainWindow(QMainWindow):
         self.signals.result.connect(self.redirect_outputs)
 
     def redirect_outputs(self, ret):
-        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stats.add_plot_mul, 'stats_p': self.stats_p.add_plot_mul}
+        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stats.add_plot_mul, 'stats_p': self.stats_p.add_plot_mul,'stats_table':self.table.add_data}
         for output in ret:
             self.aval_func[output[0]](output[1])
 
@@ -397,6 +402,61 @@ class MainPage(QWidget):
                                                                self.const.N_DOTS
                                                                ))
 
+class TablePage(QWidget):
+    def __init__(self,parent,title='TablePage',columns=1):
+        super().__init__()
+        self.parent = parent
+        self.title = title
+        self.layout = QVBoxLayout()
+
+        self.splitter = QSplitter(Qt.Vertical)
+        self.table = QTableWidget()
+        self.aver_table = QTableWidget()
+
+        self.setLayout(self.layout)
+
+
+        self.splitter.addWidget(self.table)
+        self.splitter.addWidget(self.aver_table)
+
+        self.splitter.setSizes([int(self.height()*0.95),int(self.height()*0.05)])
+        self.layout.addWidget(self.splitter)
+        self.table.setColumnCount(columns)
+        self.aver_table.setColumnCount(columns)
+        self.aver_table.setRowCount(1)
+
+        self.aver_table.verticalHeader().setDefaultSectionSize(self.aver_table.height())
+
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.aver_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.table.itemSelectionChanged.connect(self.average_selected)
+
+    def set_title(self,title):
+        self.table.setHorizontalHeaderLabels(title)
+        self.aver_table.setHorizontalHeaderLabels(title)
+    def add_row(self,data):
+        row_index = self.table.rowCount()
+        self.table.insertRow(row_index)
+        for col,value in enumerate(data):
+            self.table.setItem(row_index, col, QTableWidgetItem(str(value)))
+
+    def add_data(self,data):
+        for line in data:
+            self.add_row(line)
+
+    def average_selected(self):
+        self.selected = self.table.selectedItems()
+        temp = np.array([el.text() for el in self.selected]).reshape(-1, 6).T
+        data = temp.astype(float).mean(axis=1)
+
+        for col,value in enumerate(data):
+            self.aver_table.setItem(0, col, QTableWidgetItem(str(value)))
+
+
+
+
 class GraphPage(QWidget):
     def __init__(self, parent, canvas_count=1, title='PlotPage', title_plots=None, x_labels=None, y_labels=None,
                  color=(255, 255, 255), bg_color=(0, 0, 0)):
@@ -465,9 +525,9 @@ class StatGraphPage(GraphPage):
         super().__init__(parent, canvas_count=4, title=title, title_plots=('DEV', 'MOD', 'SKEW', 'KURT'),
                          x_labels=x_labels, y_labels=y_labels, color=color, bg_color=bg_color)
 
-        self.table_p = pg.TableWidget()
+
         self.table_un = pg.TableWidget()  # сколько всего точек, медианное отклонение, число точек не мономодальных
-        self.table_list = {'paired': self.table_p,'unpaired': self.table_un}
+        self.table_list = {'unpaired': self.table_un}
 
         self.p = p_val
         self.table_data = np.zeros((3, 2))
@@ -480,7 +540,7 @@ class StatGraphPage(GraphPage):
         self.table_layout = QtWidgets.QHBoxLayout()
         self.layout.addLayout(self.table_layout)
         self.table_layout.addWidget(self.table_un)
-        self.table_layout.addWidget(self.table_p)
+
     def add_row(self,table_name,data):
         row_index = self.table_data[table_name].rowCount()
         self.table_data[table_name].insertRow(row_index)
@@ -526,8 +586,6 @@ class StatGraphPage(GraphPage):
 
         self.plot_spaces[plot_id].plot(x, y, stepMode=True, name=plot_name, pen=pen)
         self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
-
-
 
 
 '''functions declaration'''
@@ -729,6 +787,36 @@ def prepare_array(distances):
     sorted = pre_sorted[:, pre_sorted[0].argsort()]
     return sorted
 
+def concover(arr1:np.ndarray,arr2:np.ndarray):
+    dev = lambda data: np.abs(data - np.median(data))
+    sq_sum = lambda data: np.sum(data**2)
+    dev1 = dev(arr1)
+    dev2 = dev(arr2)
+
+    all_devs = np.hstack((dev1, dev2))
+    ranks = stats.rankdata(all_devs)
+
+    rank1 = ranks[:len(dev1)]
+    rank2 = ranks[len(dev1):]
+
+    sum1 = sq_sum(rank1)
+    sum2 = sq_sum(rank2)
+
+    N = len(dev1)+len(dev2)
+    mean_rank = (N+1)/2
+
+    ss_between = (
+        len(dev1)*(np.mean(rank1)-mean_rank)**2 +
+        len(dev2)*(np.mean(rank2)-mean_rank)**2
+    )
+
+    ss_total = np.sum((ranks-mean_rank)**2)
+
+    T = (N-1)*ss_between/ss_total
+    p_value = 1 - stats.chi2.cdf(T, 2)
+    return p_value
+
+
 # вычислить среднее и дисперсии, проверить нормальность, проверить гипотезы о значимости различия средних и дисперсий, возможно посчитать форму распределения
 def stat_params_paired_single(peak_raw, peak_aln, p_value=0.05):
     """paired peak comparison"""
@@ -744,11 +832,11 @@ def stat_params_paired_single(peak_raw, peak_aln, p_value=0.05):
     if check_normal:
         neq_var = stats.levene(peak_raw, peak_aln)[1] < p_value
         neq_mean = stats.ttest_ind(peak_raw, peak_aln,nan_policy='omit')[1] < p_value
+    else:
+        neq_mean = stats.mannwhitneyu(peak_raw, peak_aln)[1] < p_value
+        neq_var = stats.ansari(peak_raw, peak_aln)[1] < p_value
 
-    return mean_r - mean_a, var_r - var_a,var_r,var_a,check_normal, neq_mean, neq_var
-
-def stat_params_paired(ds_raw,ds_aln,p_value=0.05):
-    pass
+    return mean_r - mean_a, var_r, var_a,float(check_normal), float(neq_mean), float(neq_var)
 
 
 def stat_params_unpaired(ds):
@@ -820,9 +908,7 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
 
         aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln)
 
-        s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object').T
-
-        s_p_names = np.array(['d_mean','d_var','is normal','eq_mean','eq_var'])
+        s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object')
 
         ret = (
             ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
@@ -830,9 +916,13 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
                       (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
                       (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
             ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
-            ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T))
+            ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
+            ('stats_table',s_p)
         )
+        print('_____________________')
+        print(s_p)
 
+        print('_____________________')
         return ret
 
 if __name__ == '__main__':
