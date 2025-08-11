@@ -471,6 +471,7 @@ class GraphPage(QWidget):
         self.parent = parent
         self.title = title
         self.plot_spaces = [pg.PlotWidget() for i in range(canvas_count)]
+        [pwid.addLegend(brush='black') for pwid in self.plot_spaces]
         self.layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.layout)
         for i in range(canvas_count):
@@ -479,6 +480,7 @@ class GraphPage(QWidget):
             self.layout.addWidget(self.plot_spaces[i])
             self.plot_spaces[i].setLabel('bottom', x_labels[i])
             self.plot_spaces[i].setLabel('left', y_labels[i])
+
 
     def add_plot(self, data, plot_name, color, canvas_name=None):
         if canvas_name is None:
@@ -553,12 +555,10 @@ class StatGraphPage(GraphPage):
     def add_plot_mul(self, ds):
         self.fixed_colors = [
             pg.mkColor('blue'),  # Синий
-            pg.mkColor('red'),  # Красный
-            pg.mkColor('green'),  # Зеленый
-            pg.mkColor('yellow'),  # Желтый
-            pg.mkColor('purple'),  # Фиолетовый
-            pg.mkColor('cyan'),  # Голубой
+            pg.mkColor('red')
         ]
+
+
         for n in range(len(ds)):
             data = ds[n]
             ds_color = self.fixed_colors[n]
@@ -880,7 +880,7 @@ def criteria_apply(arr,inten):
 def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
         features_raw = File(RAW).read(DATASET)
         features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV,limit=500)
 
         distance_list_prepared = prepare_array(distance_list)
         raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -928,5 +928,6 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     main_window = MainWindow()
-    main_window.show()
+    main_window.showMaximized()
+
     sys.exit(app.exec_())
