@@ -356,7 +356,7 @@ class MainPage(QWidget):
         self.main_layout.addWidget(self.parent.console_log)
 
     def open_file(self, raw_filename):
-        filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "HDF (*.hdf,*.h5,,'*.hdf5');;All Files (*)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "HDF (*.hdf *.hdf5 *.h5);;All Files (*)")
         if not filename: return
         raw_filename.setText(filename)
 
