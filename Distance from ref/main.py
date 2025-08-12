@@ -340,9 +340,9 @@ class MainPage(QWidget):
         form_layout.addRow(QLabel("Bandwidth:"), self.bw_set)
         form_layout.addRow(QLabel("Number of dots:"), self.n_dots_set)
 
-        self.config_button = QPushButton("Browse config")
+        self.config_button = QPushButton("Open config file")
         self.config_button.clicked.connect(lambda: self.open_config())
-        self.load_config_button = QPushButton("Load")
+        self.load_config_button = QPushButton("Save configs")
         self.load_config_button.clicked.connect(lambda: self.save_config())
         self.calc_button = QPushButton("Calculate")
         config_layout.addWidget(self.config_button)
@@ -393,6 +393,22 @@ class MainPage(QWidget):
             print(e)
 
     def signal(self):
+        try:
+            data = (self.raw_filename.text(),
+                    self.aln_filename.text(),
+                    self.ref_set.text(),
+                    self.dev_set.text(),
+                    self.dataset.text(),
+                    self.bw_set.text(),
+                    self.n_dots_set.text())
+            if '' in data:
+                raise Exception('Empty string')
+            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET, Const.BW, Const.N_DOTS = data[0], data[1], float(
+                data[2]), float(
+                data[3]), data[4], float(data[5]), int(data[6])
+            self.calc_button.setEnabled(True)
+        except Exception as e:
+            print(e)
         self.parent.start_calc(target=find_dots_process, args=(self.const.RAW,
                                                                self.const.ALN,
                                                                self.const.DATASET,
