@@ -591,7 +591,7 @@ class StatGraphPage(GraphPage):
 '''functions declaration'''
 
 
-def peak_picking(X, Y, oversegmentation_filter=0, peak_location=1):
+def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
     n = X.size
     # Robust valley finding
     valley_dots = np.concatenate((np.where(np.diff(Y) != 0)[0], [n-1]))    
