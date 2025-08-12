@@ -594,13 +594,11 @@ class StatGraphPage(GraphPage):
 def peak_picking(X, Y, oversegmentation_filter=0, peak_location=1):
     n = X.size
     # Robust valley finding
-    h = np.concatenate(([-1], np.where(np.diff(Y) != 0)[0], [n - 1]))
-    g = (np.diff(Y[[h[1], *h[1:]]]) <= 0) & (np.diff(Y[[*h[1:], h[-1]]]) >= 0)
-
-    left_min = h[np.concatenate([g, [False]])] + 1
-    right_min = h[np.concatenate([[False], g])]
-    left_min = left_min[:-1]
-    right_min = right_min[1:]
+    valley_dots = np.concatenate((np.where(np.diff(Y) != 0)[0], [n-1]))    
+    loc_min = np.diff(Y[valley_dots])
+    loc_min = (np.array([True,*(loc_min < 0)])) & np.array(([*(loc_min > 0),True]))
+    left_min = np.concatenate([[-1],valley_dots[:-1]])[loc_min][:-1] + 1
+    right_min = valley_dots[loc_min][1:]
     # Compute max and min for every peak
     size = left_min.shape
     val_max = np.empty(size)
@@ -608,31 +606,40 @@ def peak_picking(X, Y, oversegmentation_filter=0, peak_location=1):
     for idx, [lm, rm] in enumerate(zip(left_min, right_min)):
         pp = lm + np.argmax(Y[lm:rm])
         vm = np.max(Y[lm:rm])
-        val_max[idx] = vm
+        val_max[idx] = vm 
         pos_peak[idx] = pp
 
     # Remove oversegmented peaks
-    while True:
+    if oversegmentation_filter:
+        while True:
+            peak_thld = val_max * peak_location - math.sqrt(np.finfo(float).eps)
+            pkX = np.empty(left_min.shape)
+            
+            for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_thld)):
+                mask = Y[lm:rm] >= th
+                if np.sum(mask) == 0:
+                    pkX[idx]=np.nan
+                else:
+                    pkX[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
+            dpkX = np.concatenate(([np.inf], np.diff(pkX), [np.inf]))
+            
+            j = np.where((dpkX[1:-1] <= oversegmentation_filter) & (dpkX[1:-1] <= dpkX[:-2]) & (dpkX[1:-1] < dpkX[2:]))[0]
+            if j.size == 0:
+                break
+            left_min = np.delete(left_min, j + 1)
+            right_min = np.delete(right_min, j)
+            val_max[j] = np.maximum(val_max[j], val_max[j + 1])
+            val_max = np.delete(val_max, j + 1)
+    else:
         peak_thld = val_max * peak_location - math.sqrt(np.finfo(float).eps)
         pkX = np.empty(left_min.shape)
-
+        
         for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_thld)):
             mask = Y[lm:rm] >= th
             if np.sum(mask) == 0:
-                pkX[idx] = np.nan
+                pkX[idx]=np.nan
             else:
                 pkX[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
-        dpkX = np.concatenate(([np.inf], np.diff(pkX), [np.inf]))
-
-        j = np.where((dpkX[1:-1] <= oversegmentation_filter) & (dpkX[1:-1] <= dpkX[:-2]) & (dpkX[1:-1] < dpkX[2:]))[0]
-        if j.size == 0:
-            break
-        left_min = np.delete(left_min, j + 1)
-        right_min = np.delete(right_min, j)
-
-        val_max[j] = np.maximum(val_max[j], val_max[j + 1])
-        val_max = np.delete(val_max, j + 1)
-    # print(pkX,X[left_min],X[right_min])
     return pkX, X[left_min], X[right_min]
 
 
