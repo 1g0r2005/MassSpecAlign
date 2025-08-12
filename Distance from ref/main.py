@@ -342,18 +342,32 @@ class MainPage(QWidget):
 
         self.config_button = QPushButton("Open config file")
         self.config_button.clicked.connect(lambda: self.open_config())
-        self.load_config_button = QPushButton("Save configs")
-        self.load_config_button.clicked.connect(lambda: self.save_config())
+        # self.load_config_button = QPushButton("Save configs")
+        # self.load_config_button.clicked.connect(lambda: self.save_config())
         self.calc_button = QPushButton("Calculate")
         config_layout.addWidget(self.config_button)
-        config_layout.addWidget(self.load_config_button)
+        # config_layout.addWidget(self.load_config_button)
         config_layout.addWidget(self.calc_button)
         self.calc_button.clicked.connect(lambda: self.signal())
-        self.calc_button.setEnabled(False)
+        # self.calc_button.setEnabled(False)
         self.splitter.addWidget(form_panel)
         self.splitter.addWidget(config_panel)
         self.main_layout.addWidget(self.splitter)
         self.main_layout.addWidget(self.parent.console_log)
+        try:
+            with open("last_config.yaml", 'r', encoding='utf8') as f:
+                yaml_config = yaml.load(f, Loader=yaml.FullLoader)
+                self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
+                self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
+                self.ref_set.setText(str(yaml_config['REF']))
+                self.dev_set.setText(str(yaml_config['DEV']))
+                self.dataset.setText(str(yaml_config['DATASET']))
+                self.bw_set.setText(str(yaml_config['BW']))
+                self.n_dots_set.setText(str(yaml_config['NDOTS']))
+        except Exception as error:
+            print(error)
+
+    
 
     def open_file(self, raw_filename):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "HDF (*.hdf *.hdf5 *.h5);;All Files (*)")
@@ -385,6 +399,7 @@ class MainPage(QWidget):
                     self.n_dots_set.text())
             if '' in data:
                 raise Exception('Empty string')
+            
             Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET, Const.BW, Const.N_DOTS = data[0], data[1], float(
                 data[2]), float(
                 data[3]), data[4], float(data[5]), int(data[6])
@@ -403,12 +418,24 @@ class MainPage(QWidget):
                     self.n_dots_set.text())
             if '' in data:
                 raise Exception('Empty string')
+            else:
+
+                with open('last_config.yaml', 'w') as outfile:
+                    yaml.dump({
+                        'FILE_NAMES':(data[0],data[1]),
+                        'REF': float(data[2]),
+                        'DEV': float(data[3]),
+                        'DATASET':data[4],
+                        'BW':float(data[5]),
+                        'NDOTS':int(data[6])
+                    }, outfile, default_flow_style=False)
             Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET, Const.BW, Const.N_DOTS = data[0], data[1], float(
                 data[2]), float(
                 data[3]), data[4], float(data[5]), int(data[6])
-            self.calc_button.setEnabled(True)
+            # self.calc_button.setEnabled(True)
         except Exception as e:
             print(e)
+        
         self.parent.start_calc(target=find_dots_process, args=(self.const.RAW,
                                                                self.const.ALN,
                                                                self.const.DATASET,
