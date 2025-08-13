@@ -13,9 +13,9 @@ import yaml
 from IPython.external.qt_for_kernel import QtCore
 from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import QTimer, QObject, pyqtSignal, Qt
+from PyQt5.QtCore import QTimer, QObject, pyqtSignal, Qt, QThread
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
-    QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter
+    QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter, QProgressBar
 from diptest import diptest
 from numba import jit
 from tqdm import tqdm
@@ -41,7 +41,61 @@ class WorkerSignals(QObject):
     output = pyqtSignal(str)
     error = pyqtSignal(str)
     result = pyqtSignal(object)
+    finished = pyqtSignal()
+    progress = pyqtSignal(int)
+    create_pbar = pyqtSignal(tuple)
 
+    def find_dots_process(self):
+        features_raw = File(Const.RAW).read(Const.DATASET)
+        features_aln = File(Const.ALN).read(Const.DATASET)
+        distance_list = read_dataset(self,features_raw, features_aln, Const.REF, Const.DEV)
+
+        distance_list_prepared = prepare_array(distance_list)
+        raw_concat, aln_concat, id_concat = distance_list_prepared
+
+        kde_x_raw, kde_y_raw = FFTKDE(bw=Const.BW, kernel='gaussian').fit(raw_concat).evaluate(Const.N_DOTS)
+        kde_x_aln, kde_y_aln = FFTKDE(bw=Const.BW, kernel='gaussian').fit(aln_concat).evaluate(Const.N_DOTS)
+
+        epsilon = np.max(kde_y_raw) * 0.01
+
+        center_r, left_r, right_r = peak_picking(kde_x_raw, kde_y_raw)
+        center_a, left_a, right_a = peak_picking(kde_x_aln, kde_y_aln)
+        # восстановим высоту пиков
+        max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
+                                                                                          kde_y_aln)
+
+        borders_r = np.stack((left_r, right_r), axis=1)
+        borders_a = np.stack((left_a, right_a), axis=1)
+        ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
+        ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
+
+        c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
+
+        peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
+        peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
+
+        aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln)
+
+        s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object')
+
+        ret = (
+            ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
+                      ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
+                      (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
+                      (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
+            ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
+            ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
+            ('stats_table',s_p)
+        )
+        print('_____________________')
+        print(s_p)
+
+        print('_____________________')
+        self.finished.emit()
+        self.result.emit(ret)
+# class Worker_processing(QObject):
+    
+        # return ret
 
 class StreamRedirect:
     def __init__(self, q):
@@ -350,10 +404,18 @@ class MainPage(QWidget):
         config_layout.addWidget(self.calc_button)
         self.calc_button.clicked.connect(lambda: self.signal())
         # self.calc_button.setEnabled(False)
+        self.pbar_widget = QWidget()
+        self.pbar_layout = QFormLayout(self.pbar_widget)
+        self.pbar = QProgressBar()
+        self.pbar_label = QLabel("Spectra processing:")
+        self.pbar_layout.addRow(self.pbar_label,self.pbar)
         self.splitter.addWidget(form_panel)
         self.splitter.addWidget(config_panel)
         self.main_layout.addWidget(self.splitter)
         self.main_layout.addWidget(self.parent.console_log)
+        self.main_layout.addWidget(self.pbar_widget)
+        self.pbar_widget.hide()
+        
         try:
             with open("last_config.yaml", 'r', encoding='utf8') as f:
                 yaml_config = yaml.load(f, Loader=yaml.FullLoader)
@@ -386,28 +448,12 @@ class MainPage(QWidget):
             self.dataset.setText(str(yaml_config['DATASET']))
             self.bw_set.setText(str(yaml_config['BW']))
             self.n_dots_set.setText(str(yaml_config['NDOTS']))
-
-
-    def save_config(self):
-        try:
-            data = (self.raw_filename.text(),
-                    self.aln_filename.text(),
-                    self.ref_set.text(),
-                    self.dev_set.text(),
-                    self.dataset.text(),
-                    self.bw_set.text(),
-                    self.n_dots_set.text())
-            if '' in data:
-                raise Exception('Empty string')
-            
-            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET, Const.BW, Const.N_DOTS = data[0], data[1], float(
-                data[2]), float(
-                data[3]), data[4], float(data[5]), int(data[6])
-            self.calc_button.setEnabled(True)
-        except Exception as e:
-            print(e)
-
+    def Pbar_set_ranges(self, ranges):
+        self.pbar.setRange(*ranges)
+    def Pbar_forwarder(self, n):
+        self.pbar.setValue(n)
     def signal(self):
+        self.pbar_widget.show()
         try:
             data = (self.raw_filename.text(),
                     self.aln_filename.text(),
@@ -436,14 +482,40 @@ class MainPage(QWidget):
         except Exception as e:
             print(e)
         
-        self.parent.start_calc(target=find_dots_process, args=(self.const.RAW,
-                                                               self.const.ALN,
-                                                               self.const.DATASET,
-                                                               self.const.REF,
-                                                               self.const.DEV,
-                                                               self.const.BW,
-                                                               self.const.N_DOTS
-                                                               ))
+        self.thread = QThread()
+        self.processing = WorkerSignals()
+        self.processing.moveToThread(self.thread)
+        self.thread.started.connect(self.processing.find_dots_process)
+        self.processing.finished.connect(self.thread.quit)
+        self.processing.finished.connect(self.processing.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.processing.create_pbar.connect(self.Pbar_set_ranges)
+        self.processing.progress.connect(self.Pbar_forwarder)
+        self.thread.start()
+        self.config_button.setEnabled(False)
+        self.calc_button.setEnabled(False)
+        self.processing.result.connect(main_window.redirect_outputs)
+        self.thread.finished.connect(
+            lambda: self.config_button.setEnabled(True)
+        )
+        self.thread.finished.connect(
+            lambda: self.calc_button.setEnabled(True)
+        )
+        self.thread.finished.connect(
+            lambda: self.pbar.hide()
+        )
+        self.thread.finished.connect(
+            lambda: self.pbar_label.setText("Processing done")
+        )
+
+        # self.parent.start_calc(target=find_dots_process, args=(self.const.RAW,
+        #                                                        self.const.ALN,
+        #                                                        self.const.DATASET,
+        #                                                        self.const.REF,
+        #                                                        self.const.DEV,
+        #                                                        self.const.BW,
+        #                                                        self.const.N_DOTS
+        #                                                        ))
 
 class TablePage(QWidget):
     def __init__(self,parent,title='TablePage',columns=1):
@@ -783,7 +855,7 @@ def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0) -> [float, float
     return ref_index, dataset[ref_index]
 
 
-def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, limit=None):
+def read_dataset(self, dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, limit=None):
     """
     initial data verifying and recording into Dataset objects
     input - dataset_raw, dataset_aln - np.ndarray arrays with full recorded data,
@@ -791,7 +863,6 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, lim
     return - (void function)
     """
     start_index, end_index = int(min(dataset_raw[0])), int(max(dataset_raw[0]))
-    print(start_index)
     if limit is not None:
         if start_index + limit <= end_index:
             end_index = start_index + limit
@@ -800,7 +871,9 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, lim
 
     dataset_list = np.empty((2, set_num), dtype=Dataset)
 
-    for index in tqdm(range(start_index,end_index+1), desc='Прогресс'):
+    self.create_pbar.emit((0,end_index-start_index))
+
+    for spec_n, index in enumerate(range(start_index,end_index+1)):
         index_raw, index_aln = get_index(dataset_raw, index), get_index(dataset_aln, index)
 
         data_raw_unsorted = dataset_raw[1:3, index_raw[0][0]:index_raw[0][-1] + 1]
@@ -825,6 +898,7 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, lim
 
         dataset_list[0, index] = np.array(checked_raw)  # - checked_raw.reference
         dataset_list[1, index] = np.array(checked_aln)  # - checked_aln.reference
+        self.progress.emit(spec_n)
 
     return dataset_list
 
@@ -927,53 +1001,53 @@ def criteria_apply(arr,inten):
 '''process main function'''
 
 
-def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
-        features_raw = File(RAW).read(DATASET)
-        features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV)
+# def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
+#         features_raw = File(RAW).read(DATASET)
+#         features_aln = File(ALN).read(DATASET)
+#         distance_list = read_dataset(features_raw, features_aln, REF, DEV)
 
-        distance_list_prepared = prepare_array(distance_list)
-        raw_concat, aln_concat, id_concat = distance_list_prepared
+#         distance_list_prepared = prepare_array(distance_list)
+#         raw_concat, aln_concat, id_concat = distance_list_prepared
 
-        kde_x_raw, kde_y_raw = FFTKDE(bw=BW, kernel='gaussian').fit(raw_concat).evaluate(N_DOTS)
-        kde_x_aln, kde_y_aln = FFTKDE(bw=BW, kernel='gaussian').fit(aln_concat).evaluate(N_DOTS)
+#         kde_x_raw, kde_y_raw = FFTKDE(bw=BW, kernel='gaussian').fit(raw_concat).evaluate(N_DOTS)
+#         kde_x_aln, kde_y_aln = FFTKDE(bw=BW, kernel='gaussian').fit(aln_concat).evaluate(N_DOTS)
 
-        epsilon = np.max(kde_y_raw) * 0.01
+#         epsilon = np.max(kde_y_raw) * 0.01
 
-        center_r, left_r, right_r = peak_picking(kde_x_raw, kde_y_raw)
-        center_a, left_a, right_a = peak_picking(kde_x_aln, kde_y_aln)
-        # восстановим высоту пиков
-        max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
-                                                                                          kde_y_aln)
+#         center_r, left_r, right_r = peak_picking(kde_x_raw, kde_y_raw)
+#         center_a, left_a, right_a = peak_picking(kde_x_aln, kde_y_aln)
+#         # восстановим высоту пиков
+#         max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
+#                                                                                           kde_y_aln)
 
-        borders_r = np.stack((left_r, right_r), axis=1)
-        borders_a = np.stack((left_a, right_a), axis=1)
-        ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
-        ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
+#         borders_r = np.stack((left_r, right_r), axis=1)
+#         borders_a = np.stack((left_a, right_a), axis=1)
+#         ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
+#         ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
 
-        c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
+#         c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
 
-        peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
-        peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
+#         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
+#         peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-        aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln)
+#         aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln)
 
-        s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object')
+#         s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object')
 
-        ret = (
-            ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
-                      ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
-                      (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
-                      (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
-            ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
-            ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
-            ('stats_table',s_p)
-        )
-        print('_____________________')
-        print(s_p)
+#         ret = (
+#             ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
+#                       ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
+#                       (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
+#                       (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
+#             ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
+#             ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
+#             ('stats_table',s_p)
+#         )
+#         print('_____________________')
+#         print(s_p)
 
-        print('_____________________')
-        return ret
+#         print('_____________________')
+#         return ret
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
