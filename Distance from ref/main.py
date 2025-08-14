@@ -14,8 +14,10 @@ from IPython.external.qt_for_kernel import QtCore
 from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal, Qt
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
-    QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter
+    QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter, \
+    QHBoxLayout, QTreeWidget, QTreeWidgetItem
 from diptest import diptest
 from numba import jit
 from tqdm import tqdm
@@ -218,6 +220,68 @@ class LogWidget(QtWidgets.QTextEdit):
         except Exception as e:
             print(e)
 
+class TreeWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.initUI()
+
+    def initUI(self):
+        # Создаем layout и tree widget
+        layout = QVBoxLayout(self)
+        self.tree = QTreeWidget()
+        self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree.itemDoubleClicked.connect(self.get_path)
+        layout.addWidget(self.tree)
+
+        self.tree.expandAll()
+        self.tree.setHeaderLabels(['Name','Type','Shape','DType'])
+
+        self.setLayout(layout)
+
+    def populate_tree(self,path):
+        def get_node(name, obj, indent='',parent=None):
+            """Helper function to recursively print group and dataset info."""
+            child = None
+            if isinstance(obj, h5py.Group):
+                if parent is not None:
+                    child = QTreeWidgetItem(parent)
+                    child.setText(0, name)
+                    child.setText(1, 'Group')
+                    child.setIcon(0, QIcon("folder_ico.png"))
+
+                for key, item in obj.items():
+                    get_node(key, item, indent + '  ',parent=child)
+
+            elif isinstance(obj, h5py.Dataset):
+                if parent is not None:
+                    child = QTreeWidgetItem(parent)
+                    child.setText(0, name)
+                    child.setText(1,'Dataset')
+                    child.setText(2,str(obj.shape))
+                    child.setText(3,str(obj.dtype))
+                    child.setIcon(0, QIcon("ds_ico.png"))
+
+        with h5py.File(path,'r') as f:
+            root = QTreeWidgetItem(self.tree)
+            root.setText(0,'root')
+            get_node('/',f,parent=root)
+
+    def get_path(self):
+        selection = self.tree.currentItem()
+        path = []
+        current = selection
+        while current is not None:
+            path.insert(0,current.text(0))
+            current = current.parent()
+
+        path_join = "\\".join(path).replace('root\\/','')
+        print(path_join)
+        return path_join
+
+    def update_tree(self,path):
+        self.tree.clear()
+        self.populate_tree(path)
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -299,8 +363,37 @@ class MainPage(QWidget):
         super().__init__()
         self.title = title
         self.parent = parent
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.splitter = QtWidgets.QSplitter(self)
+
+        self.main_layout = QHBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.main_splitter = QSplitter()
+
+        self.left_main_widget = QWidget()
+        self.right_main_widget = QWidget()
+
+        self.left_layout = QVBoxLayout()
+
+        self.right_layout = QVBoxLayout()
+
+        self.left_main_widget.setLayout(self.left_layout)
+        self.right_main_widget.setLayout(self.right_layout)
+
+        self.main_splitter.addWidget(self.left_main_widget)
+        self.main_splitter.addWidget(self.right_main_widget)
+
+        self.main_layout.addWidget(self.main_splitter)
+
+        self.left_splitter = QSplitter(Qt.Vertical)
+
+        self.raw_tree = TreeWidget()
+        self.aln_tree = TreeWidget()
+
+        self.left_splitter.addWidget(self.raw_tree)
+        self.left_splitter.addWidget(self.aln_tree)
+        self.left_layout.addWidget(self.left_splitter)
+
+        self.splitter = QSplitter()
         self.const = Const
 
         form_panel = QtWidgets.QWidget()
@@ -310,7 +403,7 @@ class MainPage(QWidget):
         config_panel = QtWidgets.QWidget()
         config_layout = QtWidgets.QVBoxLayout()
         config_panel.setLayout(config_layout)
-        self.setLayout(self.main_layout)
+        #self.setLayout(self.right_layout)
 
         # Raw
         self.raw_layout = QtWidgets.QHBoxLayout()
@@ -329,6 +422,10 @@ class MainPage(QWidget):
         # ref and dev
         self.dataset = QLineEdit()
         self.ref_set = QLineEdit()
+
+        self.raw_filename.setEnabled(False)
+        self.aln_filename.setEnabled(False)
+
         self.dev_set = QLineEdit()
         self.bw_set = QLineEdit()
         self.n_dots_set = QLineEdit()
@@ -352,8 +449,12 @@ class MainPage(QWidget):
         self.calc_button.setEnabled(False)
         self.splitter.addWidget(form_panel)
         self.splitter.addWidget(config_panel)
-        self.main_layout.addWidget(self.splitter)
-        self.main_layout.addWidget(self.parent.console_log)
+        self.right_layout.addWidget(self.splitter)
+        self.right_layout.addWidget(self.parent.console_log)
+
+        self.raw_filename.textChanged.connect(lambda text: self.raw_tree.update_tree(text))
+        self.aln_filename.textChanged.connect(lambda text: self.aln_tree.update_tree(text))
+
 
     def open_file(self, raw_filename):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "HDF (*.hdf,*.h5,,'*.hdf5');;All Files (*)")
@@ -560,15 +661,16 @@ class StatGraphPage(GraphPage):
 
 
         for n in range(len(ds)):
-            data = ds[n]
+            data = ds[n][0]
+            data_name = ds[n][1]
             ds_color = self.fixed_colors[n]
 
             self.table_data[0, n] = len(data[0])
 
-            self.add_plot(data[0], f'st_dev_{n}', ds_color, 'DEV')
-            self.add_plot(data[1], f'dip_{n}', ds_color, 'MOD')
-            self.add_plot(data[3], f'skew_{n}', ds_color, 'SKEW')
-            self.add_plot(data[4], f'kurt_{n}', ds_color, 'KURT')
+            self.add_plot(data[0], f'st dev {data_name}', ds_color, 'DEV')
+            self.add_plot(data[1], f'dip {data_name}', ds_color, 'MOD')
+            self.add_plot(data[3], f'skew {data_name}', ds_color, 'SKEW')
+            self.add_plot(data[4], f'kurt {data_name}', ds_color, 'KURT')
             self.table_data[1, n] = np.where(data[2] < self.p)[0].size
             self.table_data[2, n] = np.median(data[0])
         self.table_un.setData(self.table_data)
@@ -582,7 +684,7 @@ class StatGraphPage(GraphPage):
             plot_id = self.canvas_adj[canvas_name]
         pen = pg.mkPen(color=color)
         no_nan = lambda arr: arr[~np.isnan(arr)]
-        y, x = np.histogram(no_nan(data), bins=60)
+        y, x = np.histogram(no_nan(data), bins=500)
 
         self.plot_spaces[plot_id].plot(x, y, stepMode=True, name=plot_name, pen=pen)
         self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
@@ -807,8 +909,7 @@ def concover(arr1:np.ndarray,arr2:np.ndarray):
 
     ss_between = (
         len(dev1)*(np.mean(rank1)-mean_rank)**2 +
-        len(dev2)*(np.mean(rank2)-mean_rank)**2
-    )
+        len(dev2)*(np.mean(rank2)-mean_rank)**2)
 
     ss_total = np.sum((ranks-mean_rank)**2)
 
@@ -825,8 +926,6 @@ def stat_params_paired_single(peak_raw, peak_aln, p_value=0.05):
     mean_r, mean_a = np.mean(peak_raw), np.mean(peak_aln)
     var_r, var_a = norm_var(peak_raw), norm_var(peak_aln)
 
-    neq_mean, neq_var = np.nan, np.nan
-    #kstest(data, 'norm', args=(np.mean(data), np.std(data)))
     check_normal_func = lambda data,p: stats.kstest(data,'norm',args=(np.mean(data),np.std(data)))[1]>p
     check_normal = check_normal_func(peak_raw,p_value) & check_normal_func(peak_aln,p_value)
     if check_normal:
@@ -858,7 +957,6 @@ def out_criteria(arr, inten):# TODO: add documentation (see TG for descr.)
     int_criteria = abs(inten[:-1] / inten[1:] - 1) < max_diff
 
     width_criteria = np.diff(arr) / moving_average(np.diff(arr.linked_array).flatten()) <= width_eps
-    #print(int_criteria.shape, width_criteria.shape)
     second_or = np.full(arr.shape, False)
     second_or[1:] = np.logical_and(int_criteria, width_criteria)
 
@@ -915,8 +1013,8 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
                       ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
                       (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
                       (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
-            ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
-            ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
+            ('stats', ((stat_params_unpaired(peak_lists_raw).T,'raw'), (stat_params_unpaired(peak_lists_aln).T,'aln'))),
+            ('stats_p', ((stat_params_unpaired(aln_peak_lists_raw).T,'raw'), (stat_params_unpaired(aln_peak_lists_aln).T,'aln'))),
             ('stats_table',s_p)
         )
         print('_____________________')
