@@ -4,7 +4,8 @@ FILE_NAMES:
   - !!str C:/Users/doomu/OneDrive/Документы/Distribution/HDF/Data/E031_032_033_5mg_60C_90sec_9AA_161023.hdf5
 FOLDERS: !!str HDF\\Data\\
 CASH: !!str Cash\\cash.hdf5
-DATASET: !!str roi2_e033/00/features
+DATASET_R: !!str roi2_e033/00/features
+DATASET_A: !!str roi2_e033/00/features
 REF: !!float 193.07712
 DEV: !!float 1
 BW: !!float 0.02

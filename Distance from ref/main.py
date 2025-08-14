@@ -32,7 +32,8 @@ class Const:
     RAW = None
     ALN = None
     CASH = None
-    DATASET = None
+    DATASET_RAW = None
+    DATASET_ALN = None
     REF = None
     DEV = None
     N_DOTS = None
@@ -221,9 +222,10 @@ class LogWidget(QtWidgets.QTextEdit):
             print(e)
 
 class TreeWidget(QWidget):
+    path_signal = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
-
         self.initUI()
 
     def initUI(self):
@@ -275,8 +277,8 @@ class TreeWidget(QWidget):
             path.insert(0,current.text(0))
             current = current.parent()
 
-        path_join = "\\".join(path).replace('root\\/','')
-        print(path_join)
+        path_join = "/".join(path).replace('root//','')
+        self.path_signal.emit(path_join)
         return path_join
 
     def update_tree(self,path):
@@ -420,7 +422,9 @@ class MainPage(QWidget):
         self.aln_layout.addWidget(self.aln_filename)
         self.aln_layout.addWidget(self.aln_open_button)
         # ref and dev
-        self.dataset = QLineEdit()
+        self.dataset_raw = QLineEdit()
+        self.dataset_aln = QLineEdit()
+
         self.ref_set = QLineEdit()
 
         self.raw_filename.setEnabled(False)
@@ -429,9 +433,11 @@ class MainPage(QWidget):
         self.dev_set = QLineEdit()
         self.bw_set = QLineEdit()
         self.n_dots_set = QLineEdit()
+
         form_layout.addRow(QLabel("Raw data:"), self.raw_layout)
         form_layout.addRow(QLabel("Alignment data:"), self.aln_layout)
-        form_layout.addRow(QLabel("Dataset:"), self.dataset)
+        form_layout.addRow(QLabel("Dataset (raw):"), self.dataset_raw)
+        form_layout.addRow(QLabel("Dataset (aln):"), self.dataset_aln)
         form_layout.addRow(QLabel("Reference point:"), self.ref_set)
         form_layout.addRow(QLabel("Acceptable deviation for msalign:"), self.dev_set)
         form_layout.addRow(QLabel("Bandwidth:"), self.bw_set)
@@ -455,6 +461,8 @@ class MainPage(QWidget):
         self.raw_filename.textChanged.connect(lambda text: self.raw_tree.update_tree(text))
         self.aln_filename.textChanged.connect(lambda text: self.aln_tree.update_tree(text))
 
+        self.raw_tree.path_signal.connect(lambda path: self.dataset_raw.setText(path))
+        self.aln_tree.path_signal.connect(lambda path: self.dataset_aln.setText(path))
 
     def open_file(self, raw_filename):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "HDF (*.hdf,*.h5,,'*.hdf5');;All Files (*)")
@@ -465,14 +473,19 @@ class MainPage(QWidget):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "yaml (*.yaml);;All Files (*)")
         if not filename: return
         with open(filename, 'r', encoding='utf8') as f:
-            yaml_config = yaml.load(f, Loader=yaml.FullLoader)
-            self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
-            self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
-            self.ref_set.setText(str(yaml_config['REF']))
-            self.dev_set.setText(str(yaml_config['DEV']))
-            self.dataset.setText(str(yaml_config['DATASET']))
-            self.bw_set.setText(str(yaml_config['BW']))
-            self.n_dots_set.setText(str(yaml_config['NDOTS']))
+            try:
+                yaml_config = yaml.load(f, Loader=yaml.FullLoader)
+                self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
+                self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
+                self.ref_set.setText(str(yaml_config['REF']))
+                self.dev_set.setText(str(yaml_config['DEV']))
+                self.dataset_raw.setText(str(yaml_config['DATASET_R']))
+                self.dataset_aln.setText(str(yaml_config['DATASET_A']))
+                self.bw_set.setText(str(yaml_config['BW']))
+                self.n_dots_set.setText(str(yaml_config['NDOTS']))
+            except Exception as e:
+                print(e)
+
 
 
     def save_config(self):
@@ -481,14 +494,15 @@ class MainPage(QWidget):
                     self.aln_filename.text(),
                     self.ref_set.text(),
                     self.dev_set.text(),
-                    self.dataset.text(),
+                    self.dataset_raw.text(),
+                    self.dataset_aln.text(),
                     self.bw_set.text(),
                     self.n_dots_set.text())
             if '' in data:
                 raise Exception('Empty string')
-            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET, Const.BW, Const.N_DOTS = data[0], data[1], float(
+            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET_RAW,Const.DATASET_ALN, Const.BW, Const.N_DOTS = data[0], data[1], float(
                 data[2]), float(
-                data[3]), data[4], float(data[5]), int(data[6])
+                data[3]), data[4],data[5], float(data[6]), int(data[7])
             self.calc_button.setEnabled(True)
         except Exception as e:
             print(e)
@@ -496,7 +510,8 @@ class MainPage(QWidget):
     def signal(self):
         self.parent.start_calc(target=find_dots_process, args=(self.const.RAW,
                                                                self.const.ALN,
-                                                               self.const.DATASET,
+                                                               self.const.DATASET_RAW,
+                                                               self.const.DATASET_ALN,
                                                                self.const.REF,
                                                                self.const.DEV,
                                                                self.const.BW,
@@ -554,9 +569,6 @@ class TablePage(QWidget):
 
         for col,value in enumerate(data):
             self.aver_table.setItem(0, col, QTableWidgetItem(str(value)))
-
-
-
 
 class GraphPage(QWidget):
     def __init__(self, parent, canvas_count=1, title='PlotPage', title_plots=None, x_labels=None, y_labels=None,
@@ -684,7 +696,7 @@ class StatGraphPage(GraphPage):
             plot_id = self.canvas_adj[canvas_name]
         pen = pg.mkPen(color=color)
         no_nan = lambda arr: arr[~np.isnan(arr)]
-        y, x = np.histogram(no_nan(data), bins=500)
+        y, x = np.histogram(no_nan(data), bins=1000)
 
         self.plot_spaces[plot_id].plot(x, y, stepMode=True, name=plot_name, pen=pen)
         self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
@@ -968,16 +980,15 @@ def criteria_apply(arr,inten):
     indexes = out_criteria(arr,inten)
     for index in indexes:
         arr_out.linked_array[index-1] = sorted([arr.linked_array[index-1,0],arr.linked_array[index,1]])
-
     return arr_out.sync_delete(indexes)
 
 
 '''process main function'''
 
 
-def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
-        features_raw = File(RAW).read(DATASET)
-        features_aln = File(ALN).read(DATASET)
+def find_dots_process(RAW, ALN, DATASET_RAW,DATASET_ALN, REF, DEV, BW, N_DOTS):
+        features_raw = File(RAW).read(DATASET_RAW)
+        features_aln = File(ALN).read(DATASET_ALN)
         distance_list = read_dataset(features_raw, features_aln, REF, DEV,limit=500)
 
         distance_list_prepared = prepare_array(distance_list)
@@ -985,15 +996,12 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
 
         kde_x_raw, kde_y_raw = FFTKDE(bw=BW, kernel='gaussian').fit(raw_concat).evaluate(N_DOTS)
         kde_x_aln, kde_y_aln = FFTKDE(bw=BW, kernel='gaussian').fit(aln_concat).evaluate(N_DOTS)
-
-        epsilon = np.max(kde_y_raw) * 0.01
-
+        #epsilon = np.max(kde_y_raw) * 0.01
         center_r, left_r, right_r = peak_picking(kde_x_raw, kde_y_raw)
         center_a, left_a, right_a = peak_picking(kde_x_aln, kde_y_aln)
         # восстановим высоту пиков
         max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
                                                                                           kde_y_aln)
-
         borders_r = np.stack((left_r, right_r), axis=1)
         borders_a = np.stack((left_a, right_a), axis=1)
         ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
@@ -1019,7 +1027,6 @@ def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
         )
         print('_____________________')
         print(s_p)
-
         print('_____________________')
         return ret
 
