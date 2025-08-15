@@ -509,11 +509,14 @@ class MainPage(QWidget):
         self.thread.finished.connect(
             lambda: self.calc_button.setEnabled(True)
         )
+        self.processing.finished.connect(
+            lambda: self.pbar_label.setText("Process done")
+        )
         self.thread.finished.connect(
             lambda: self.pbar.hide()
         )
         self.processing.error.connect(
-            lambda: self.pbar_label.setText("During proccesing occured error")
+            lambda: self.pbar_label.setText("Error occurred during processing")
         )
         self.processing.error.connect(
             lambda: self.config_button.setEnabled(True)
