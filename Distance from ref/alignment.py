@@ -38,9 +38,7 @@ def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y):
 
     x_len,y_len = len(x),len(y)
     x_n,y_n = __equal_size(x,y)
-    print('111111111111111111111111111')
-    print(x_n,y_n,type(x_n),type(y_n))
-    print('111111111111111111111111111')
+
     matrix = __make_matrix(x_n,y_n)
 
     indexes = np.array(linear_sum_assignment(matrix))
@@ -54,10 +52,19 @@ def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y):
     aln_y_linked = np.asarray(y_linked)[yind]
     return aln_x,aln_y,aln_x_linked,aln_y_linked
 
-def __w(x, y, k = 20, threshold = 10, epsilon = 1):
-    dist = ((x - y)**2+(x.linked_array-y.linked_array)**2)**0.5
-    dist_norm =  np.tanh(dist/k)
-    return dist_norm
+def __w(x, y,alpha_dist=0.1,alpha_int=3, k = 20):
+    scale = lambda var,alpha: np.exp(x*alpha)-1
+    norm = lambda var,k: np.tanh(var/k)
+
+    dist_scaled = scale(x-y,alpha_dist)
+    dint_scaled = scale(x.linked_array-y.linked_array,alpha_int)
+
+    dist_norm = norm(dist_scaled,k)
+    dint_norm = norm(dint_scaled,k)
+
+    weight = (dist_norm**2+dint_norm**2)**0.5
+
+    return weight
 
 def __make_matrix(x,y):
     matrix =  __w(x[:, np.newaxis], y[np.newaxis, :])

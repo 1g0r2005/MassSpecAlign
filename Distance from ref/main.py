@@ -17,12 +17,9 @@ from PyQt5.QtCore import QTimer, QObject, pyqtSignal, Qt, QThread
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
     QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter, \
-    QHBoxLayout, QTreeWidget, QTreeWidgetItem,QProgressBar
+    QHBoxLayout, QTreeWidget, QTreeWidgetItem, QProgressBar
 from diptest import diptest
 from numba import jit
-from tqdm import tqdm
-
-import aligment
 
 """classes declaration"""
 
@@ -50,8 +47,10 @@ class WorkerSignals(QObject):
 
     def find_dots_process(self):
         try:
-            features_raw = File(Const.RAW).read(Const.DATASET)
-            features_aln = File(Const.ALN).read(Const.DATASET)
+
+            features_raw = File(Const.RAW).read(Const.DATASET_RAW)
+            features_aln = File(Const.ALN).read(Const.DATASET_ALN)
+
             distance_list = read_dataset(self,features_raw, features_aln, Const.REF, Const.DEV)
 
             distance_list_prepared = prepare_array(distance_list)
@@ -74,18 +73,22 @@ class WorkerSignals(QObject):
             ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
 
             c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
-            c_ds_raw_intens,c_ds_aln_intens = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,kde_y_aln)
-
+            c_ds_raw_intens, c_ds_aln_intens = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,
+                                                                                                    kde_y_aln)
 
             peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
             peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
+            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = aligment.munkres_align(peak_lists_raw,
+                                                                                                      peak_lists_aln,
+                                                                                                      c_ds_raw,
+                                                                                                      c_ds_aln,
+                                                                                                      c_ds_raw_intens,
+                                                                                                      c_ds_aln_intens)
 
-            aln_peak_lists_raw,aln_peak_lists_aln,aln_kde_raw,aln_kde_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln,c_ds_raw,c_ds_aln,c_ds_raw_intens,c_ds_aln_intens)
-
-            s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object')
-
-
+            s_p = np.array(
+                [stat_params_paired_single(x_el, y_el) for x_el, y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],
+                dtype='object')
 
             ret = (
                 ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
