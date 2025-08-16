@@ -14,8 +14,10 @@ from IPython.external.qt_for_kernel import QtCore
 from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal, Qt, QThread
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
-    QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter, QProgressBar
+    QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter, \
+    QHBoxLayout, QTreeWidget, QTreeWidgetItem,QProgressBar
 from diptest import diptest
 from numba import jit
 from tqdm import tqdm
@@ -30,7 +32,8 @@ class Const:
     RAW = None
     ALN = None
     CASH = None
-    DATASET = None
+    DATASET_RAW = None
+    DATASET_ALN = None
     REF = None
     DEV = None
     N_DOTS = None
@@ -71,19 +74,26 @@ class WorkerSignals(QObject):
             ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
 
             c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
+            c_ds_raw_intens,c_ds_aln_intens = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,kde_y_aln)
+
 
             peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
             peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-            aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln)
+
+            aln_peak_lists_raw,aln_peak_lists_aln,aln_kde_raw,aln_kde_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln,c_ds_raw,c_ds_aln,c_ds_raw_intens,c_ds_aln_intens)
 
             s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object')
+
+
 
             ret = (
                 ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
                         ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
-                        (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
-                        (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
+                        (aln_kde_aln,np.max(kde_y_aln),'raw_peaks','mult','vln','kde'),
+                        (aln_kde_raw, np.max(kde_y_aln), 'raw_peaks', 'mult', 'vln', 'kde'))),
+                #(c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
+                #(c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
                 ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
                 ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
                 ('stats_table',s_p)
@@ -101,7 +111,7 @@ class WorkerSignals(QObject):
             self.finished.emit()
 
 # class Worker_processing(QObject):
-    
+
         # return ret
 
 class StreamRedirect:
@@ -279,6 +289,69 @@ class LogWidget(QtWidgets.QTextEdit):
         except Exception as e:
             print(e)
 
+class TreeWidget(QWidget):
+    path_signal = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+        # Создаем layout и tree widget
+        layout = QVBoxLayout(self)
+        self.tree = QTreeWidget()
+        self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree.itemDoubleClicked.connect(self.get_path)
+        layout.addWidget(self.tree)
+
+        self.tree.expandAll()
+        self.tree.setHeaderLabels(['Name','Type','Shape','DType'])
+
+        self.setLayout(layout)
+
+    def populate_tree(self,path):
+        def get_node(name, obj, indent='',parent=None):
+            """Helper function to recursively print group and dataset info."""
+            child = None
+            if isinstance(obj, h5py.Group):
+                if parent is not None:
+                    child = QTreeWidgetItem(parent)
+                    child.setText(0, name)
+                    child.setText(1, 'Group')
+                    child.setIcon(0, QIcon("folder_ico.png"))
+
+                for key, item in obj.items():
+                    get_node(key, item, indent + '  ',parent=child)
+
+            elif isinstance(obj, h5py.Dataset):
+                if parent is not None:
+                    child = QTreeWidgetItem(parent)
+                    child.setText(0, name)
+                    child.setText(1,'Dataset')
+                    child.setText(2,str(obj.shape))
+                    child.setText(3,str(obj.dtype))
+                    child.setIcon(0, QIcon("ds_ico.png"))
+
+        with h5py.File(path,'r') as f:
+            root = QTreeWidgetItem(self.tree)
+            root.setText(0,'root')
+            get_node('/',f,parent=root)
+
+    def get_path(self):
+        selection = self.tree.currentItem()
+        path = []
+        current = selection
+        while current is not None:
+            path.insert(0,current.text(0))
+            current = current.parent()
+
+        path_join = "/".join(path).replace('root//','')
+        self.path_signal.emit(path_join)
+        return path_join
+
+    def update_tree(self,path):
+        self.tree.clear()
+        self.populate_tree(path)
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -360,8 +433,37 @@ class MainPage(QWidget):
         super().__init__()
         self.title = title
         self.parent = parent
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.splitter = QtWidgets.QSplitter(self)
+
+        self.main_layout = QHBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.main_splitter = QSplitter()
+
+        self.left_main_widget = QWidget()
+        self.right_main_widget = QWidget()
+
+        self.left_layout = QVBoxLayout()
+
+        self.right_layout = QVBoxLayout()
+
+        self.left_main_widget.setLayout(self.left_layout)
+        self.right_main_widget.setLayout(self.right_layout)
+
+        self.main_splitter.addWidget(self.left_main_widget)
+        self.main_splitter.addWidget(self.right_main_widget)
+
+        self.main_layout.addWidget(self.main_splitter)
+
+        self.left_splitter = QSplitter(Qt.Vertical)
+
+        self.raw_tree = TreeWidget()
+        self.aln_tree = TreeWidget()
+
+        self.left_splitter.addWidget(self.raw_tree)
+        self.left_splitter.addWidget(self.aln_tree)
+        self.left_layout.addWidget(self.left_splitter)
+
+        self.splitter = QSplitter()
         self.const = Const
 
         form_panel = QtWidgets.QWidget()
@@ -371,7 +473,7 @@ class MainPage(QWidget):
         config_panel = QtWidgets.QWidget()
         config_layout = QtWidgets.QVBoxLayout()
         config_panel.setLayout(config_layout)
-        self.setLayout(self.main_layout)
+        #self.setLayout(self.right_layout)
 
         # Raw
         self.raw_layout = QtWidgets.QHBoxLayout()
@@ -388,14 +490,22 @@ class MainPage(QWidget):
         self.aln_layout.addWidget(self.aln_filename)
         self.aln_layout.addWidget(self.aln_open_button)
         # ref and dev
-        self.dataset = QLineEdit()
+        self.dataset_raw = QLineEdit()
+        self.dataset_aln = QLineEdit()
+
         self.ref_set = QLineEdit()
+
+        self.raw_filename.setEnabled(False)
+        self.aln_filename.setEnabled(False)
+
         self.dev_set = QLineEdit()
         self.bw_set = QLineEdit()
         self.n_dots_set = QLineEdit()
+
         form_layout.addRow(QLabel("Raw data:"), self.raw_layout)
         form_layout.addRow(QLabel("Alignment data:"), self.aln_layout)
-        form_layout.addRow(QLabel("Dataset:"), self.dataset)
+        form_layout.addRow(QLabel("Dataset (raw):"), self.dataset_raw)
+        form_layout.addRow(QLabel("Dataset (aln):"), self.dataset_aln)
         form_layout.addRow(QLabel("Reference point:"), self.ref_set)
         form_layout.addRow(QLabel("Acceptable deviation for msalign:"), self.dev_set)
         form_layout.addRow(QLabel("Bandwidth:"), self.bw_set)
@@ -418,11 +528,18 @@ class MainPage(QWidget):
         self.pbar_layout.addRow(self.pbar_label,self.pbar)
         self.splitter.addWidget(form_panel)
         self.splitter.addWidget(config_panel)
-        self.main_layout.addWidget(self.splitter)
-        self.main_layout.addWidget(self.parent.console_log)
-        self.main_layout.addWidget(self.pbar_widget)
+        self.right_layout.addWidget(self.splitter)
+        self.right_layout.addWidget(self.parent.console_log)
+
+        self.raw_filename.textChanged.connect(lambda text: self.raw_tree.update_tree(text))
+        self.aln_filename.textChanged.connect(lambda text: self.aln_tree.update_tree(text))
+
+        self.raw_tree.path_signal.connect(lambda path: self.dataset_raw.setText(path))
+        self.aln_tree.path_signal.connect(lambda path: self.dataset_aln.setText(path))
+
+        self.right_layout.addWidget(self.pbar_widget)
         self.pbar_widget.hide()
-        
+
         try:
             with open("last_config.yaml", 'r', encoding='utf8') as f:
                 yaml_config = yaml.load(f, Loader=yaml.FullLoader)
@@ -430,14 +547,12 @@ class MainPage(QWidget):
                 self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
                 self.ref_set.setText(str(yaml_config['REF']))
                 self.dev_set.setText(str(yaml_config['DEV']))
-                self.dataset.setText(str(yaml_config['DATASET']))
+                self.dataset_raw.setText(str(yaml_config['DATASET_R']))
+                self.dataset_aln.setText(str(yaml_config['DATESET_A']))
                 self.bw_set.setText(str(yaml_config['BW']))
                 self.n_dots_set.setText(str(yaml_config['NDOTS']))
         except Exception as error:
             print(error)
-
-    
-
     def open_file(self, raw_filename):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "HDF (*.hdf *.hdf5 *.h5);;All Files (*)")
         if not filename: return
@@ -447,14 +562,19 @@ class MainPage(QWidget):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "yaml (*.yaml);;All Files (*)")
         if not filename: return
         with open(filename, 'r', encoding='utf8') as f:
-            yaml_config = yaml.load(f, Loader=yaml.FullLoader)
-            self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
-            self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
-            self.ref_set.setText(str(yaml_config['REF']))
-            self.dev_set.setText(str(yaml_config['DEV']))
-            self.dataset.setText(str(yaml_config['DATASET']))
-            self.bw_set.setText(str(yaml_config['BW']))
-            self.n_dots_set.setText(str(yaml_config['NDOTS']))
+            try:
+                yaml_config = yaml.load(f, Loader=yaml.FullLoader)
+                self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
+                self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
+                self.ref_set.setText(str(yaml_config['REF']))
+                self.dev_set.setText(str(yaml_config['DEV']))
+                self.dataset_raw.setText(str(yaml_config['DATASET_R']))
+                self.dataset_aln.setText(str(yaml_config['DATASET_A']))
+                self.bw_set.setText(str(yaml_config['BW']))
+                self.n_dots_set.setText(str(yaml_config['NDOTS']))
+            except Exception as e:
+                print(e)
+
     def Pbar_set_ranges(self, ranges):
         self.pbar.setRange(*ranges)
     def Pbar_forwarder(self, n):
@@ -466,7 +586,8 @@ class MainPage(QWidget):
                     self.aln_filename.text(),
                     self.ref_set.text(),
                     self.dev_set.text(),
-                    self.dataset.text(),
+                    self.dataset_raw.text(),
+                    self.dataset_aln.text(),
                     self.bw_set.text(),
                     self.n_dots_set.text())
             if '' in data:
@@ -478,17 +599,18 @@ class MainPage(QWidget):
                         'FILE_NAMES':(data[0],data[1]),
                         'REF': float(data[2]),
                         'DEV': float(data[3]),
-                        'DATASET':data[4],
-                        'BW':float(data[5]),
-                        'NDOTS':int(data[6])
+                        'DATASET_R':data[4],
+                        'DATASET_A':data[5],
+                        'BW':float(data[6]),
+                        'NDOTS':int(data[7])
                     }, outfile, default_flow_style=False)
-            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET, Const.BW, Const.N_DOTS = data[0], data[1], float(
+            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET_RAW,Const.DATASET_ALN, Const.BW, Const.N_DOTS = data[0], data[1], float(
                 data[2]), float(
-                data[3]), data[4], float(data[5]), int(data[6])
+                data[3]), data[4],data[5], float(data[6]), int(data[7])
             # self.calc_button.setEnabled(True)
         except Exception as e:
             print(e)
-        
+
         self.thread = QThread()
         self.processing = WorkerSignals()
         self.processing.moveToThread(self.thread)
@@ -530,7 +652,8 @@ class MainPage(QWidget):
 
         # self.parent.start_calc(target=find_dots_process, args=(self.const.RAW,
         #                                                        self.const.ALN,
-        #                                                        self.const.DATASET,
+        #                                                        self.const.DATASET_RAW,
+        #                                                         self.const.DATASET_ALN,
         #                                                        self.const.REF,
         #                                                        self.const.DEV,
         #                                                        self.const.BW,
@@ -589,12 +712,9 @@ class TablePage(QWidget):
         for col,value in enumerate(data):
             self.aver_table.setItem(0, col, QTableWidgetItem(str(value)))
 
-
-
-
 class GraphPage(QWidget):
     def __init__(self, parent, canvas_count=1, title='PlotPage', title_plots=None, x_labels=None, y_labels=None,
-                 color=(255, 255, 255), bg_color=(0, 0, 0)):
+                 color=(255, 255, 255), bg_color=(0, 0, 0),n_colors = 8):
         super().__init__()
 
         if x_labels is None: x_labels = ['x'] * canvas_count
@@ -606,6 +726,7 @@ class GraphPage(QWidget):
         self.parent = parent
         self.title = title
         self.plot_spaces = [pg.PlotWidget() for i in range(canvas_count)]
+        [pwid.addLegend(brush='black') for pwid in self.plot_spaces]
         self.layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.layout)
         for i in range(canvas_count):
@@ -615,7 +736,10 @@ class GraphPage(QWidget):
             self.plot_spaces[i].setLabel('bottom', x_labels[i])
             self.plot_spaces[i].setLabel('left', y_labels[i])
 
-    def add_plot(self, data, plot_name, color, canvas_name=None):
+        self.palette_colors =  [pg.intColor(i,hues=n_colors) for i in range(n_colors)]
+
+
+    def add_plot(self, data, plot_name, color='w', canvas_name=None):
         if canvas_name is None:
             plot_id = 0
         else:
@@ -624,22 +748,38 @@ class GraphPage(QWidget):
         self.plot_spaces[plot_id].plot(data[0], data[1], name=plot_name, pen=pen)
         self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
 
-    def add_line(self, data, y_max, color, canvas_name=None):
+    def add_line(self, data, y_max, color='w',canvas_name=None):
         try:
             if canvas_name is None:
                 plot_id = 0
             else:
                 plot_id = self.canvas_adj[canvas_name]
 
-            pen = pg.mkPen(color=color, style=QtCore.Qt.DashLine)
             y_min = 0
             x = np.column_stack([data,
                                  data,
-                                 np.full_like(data, np.nan)]).ravel()
+                                 np.full_like(data, np.nan)])
             y = np.column_stack([np.full_like(data, y_min),
                                  np.full_like(data, y_max),
-                                 np.full_like(data, np.nan)]).ravel()
-            self.plot_spaces[plot_id].plot(x, y, pen=pen)
+                                 np.full_like(data, np.nan)])
+
+            if color == 'mult':
+
+                length = x.shape[0]
+                indices = [np.arange(i,length,len(self.palette_colors)) for i in range(len(self.palette_colors))]
+
+                x_s = [np.take(x,idx,axis=0) for idx in indices]
+                y_s = [np.take(y,idy,axis=0) for idy in indices]
+                pens = [pg.mkPen(color=self.palette_colors[i%len(self.palette_colors)]) for i in range(y.shape[0])]
+
+                for figure_index in range(len(self.palette_colors)):
+                    self.plot_spaces[plot_id].plot(x_s[figure_index].ravel(),y_s[figure_index].ravel(),pen = pens[figure_index])
+                #self.plot_spaces[plot_id].plot(x,y,pen=pens)
+            else:
+                x = x.ravel()
+                y = y.ravel()
+                pen = pg.mkPen(color=color, style=QtCore.Qt.DashLine)
+                self.plot_spaces[plot_id].plot(x, y, pen=pen)
             self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
         except Exception as e:
             print(e)
@@ -688,22 +828,21 @@ class StatGraphPage(GraphPage):
     def add_plot_mul(self, ds):
         self.fixed_colors = [
             pg.mkColor('blue'),  # Синий
-            pg.mkColor('red'),  # Красный
-            pg.mkColor('green'),  # Зеленый
-            pg.mkColor('yellow'),  # Желтый
-            pg.mkColor('purple'),  # Фиолетовый
-            pg.mkColor('cyan'),  # Голубой
+            pg.mkColor('red')
         ]
+
+
         for n in range(len(ds)):
-            data = ds[n]
+            data = ds[n][0]
+            data_name = ds[n][1]
             ds_color = self.fixed_colors[n]
 
             self.table_data[0, n] = len(data[0])
 
-            self.add_plot(data[0], f'st_dev_{n}', ds_color, 'DEV')
-            self.add_plot(data[1], f'dip_{n}', ds_color, 'MOD')
-            self.add_plot(data[3], f'skew_{n}', ds_color, 'SKEW')
-            self.add_plot(data[4], f'kurt_{n}', ds_color, 'KURT')
+            self.add_plot(data[0], f'st dev {data_name}', ds_color, 'DEV')
+            self.add_plot(data[1], f'dip {data_name}', ds_color, 'MOD')
+            self.add_plot(data[3], f'skew {data_name}', ds_color, 'SKEW')
+            self.add_plot(data[4], f'kurt {data_name}', ds_color, 'KURT')
             self.table_data[1, n] = np.where(data[2] < self.p)[0].size
             self.table_data[2, n] = np.median(data[0])
         self.table_un.setData(self.table_data)
@@ -717,7 +856,7 @@ class StatGraphPage(GraphPage):
             plot_id = self.canvas_adj[canvas_name]
         pen = pg.mkPen(color=color)
         no_nan = lambda arr: arr[~np.isnan(arr)]
-        y, x = np.histogram(no_nan(data), bins=60)
+        y, x = np.histogram(no_nan(data), bins=1000)
 
         self.plot_spaces[plot_id].plot(x, y, stepMode=True, name=plot_name, pen=pen)
         self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
@@ -729,7 +868,7 @@ class StatGraphPage(GraphPage):
 def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
     n = X.size
     # Robust valley finding
-    valley_dots = np.concatenate((np.where(np.diff(Y) != 0)[0], [n-1]))    
+    valley_dots = np.concatenate((np.where(np.diff(Y) != 0)[0], [n-1]))
     loc_min = np.diff(Y[valley_dots])
     loc_min = (np.array([True,*(loc_min < 0)])) & np.array(([*(loc_min > 0),True]))
     left_min = np.concatenate([[-1],valley_dots[:-1]])[loc_min][:-1] + 1
@@ -741,7 +880,7 @@ def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
     for idx, [lm, rm] in enumerate(zip(left_min, right_min)):
         pp = lm + np.argmax(Y[lm:rm])
         vm = np.max(Y[lm:rm])
-        val_max[idx] = vm 
+        val_max[idx] = vm
         pos_peak[idx] = pp
 
     # Remove oversegmented peaks
@@ -749,7 +888,7 @@ def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
         while True:
             peak_thld = val_max * peak_location - math.sqrt(np.finfo(float).eps)
             pkX = np.empty(left_min.shape)
-            
+
             for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_thld)):
                 mask = Y[lm:rm] >= th
                 if np.sum(mask) == 0:
@@ -757,7 +896,7 @@ def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
                 else:
                     pkX[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
             dpkX = np.concatenate(([np.inf], np.diff(pkX), [np.inf]))
-            
+
             j = np.where((dpkX[1:-1] <= oversegmentation_filter) & (dpkX[1:-1] <= dpkX[:-2]) & (dpkX[1:-1] < dpkX[2:]))[0]
             if j.size == 0:
                 break
@@ -768,7 +907,7 @@ def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
     else:
         peak_thld = val_max * peak_location - math.sqrt(np.finfo(float).eps)
         pkX = np.empty(left_min.shape)
-        
+
         for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_thld)):
             mask = Y[lm:rm] >= th
             if np.sum(mask) == 0:
@@ -951,8 +1090,7 @@ def concover(arr1:np.ndarray,arr2:np.ndarray):
 
     ss_between = (
         len(dev1)*(np.mean(rank1)-mean_rank)**2 +
-        len(dev2)*(np.mean(rank2)-mean_rank)**2
-    )
+        len(dev2)*(np.mean(rank2)-mean_rank)**2)
 
     ss_total = np.sum((ranks-mean_rank)**2)
 
@@ -969,8 +1107,6 @@ def stat_params_paired_single(peak_raw, peak_aln, p_value=0.05):
     mean_r, mean_a = np.mean(peak_raw), np.mean(peak_aln)
     var_r, var_a = norm_var(peak_raw), norm_var(peak_aln)
 
-    neq_mean, neq_var = np.nan, np.nan
-    #kstest(data, 'norm', args=(np.mean(data), np.std(data)))
     check_normal_func = lambda data,p: stats.kstest(data,'norm',args=(np.mean(data),np.std(data)))[1]>p
     check_normal = check_normal_func(peak_raw,p_value) & check_normal_func(peak_aln,p_value)
     if check_normal:
@@ -1002,7 +1138,6 @@ def out_criteria(arr, inten):# TODO: add documentation (see TG for descr.)
     int_criteria = abs(inten[:-1] / inten[1:] - 1) < max_diff
 
     width_criteria = np.diff(arr) / moving_average(np.diff(arr.linked_array).flatten()) <= width_eps
-    #print(int_criteria.shape, width_criteria.shape)
     second_or = np.full(arr.shape, False)
     second_or[1:] = np.logical_and(int_criteria, width_criteria)
 
@@ -1014,17 +1149,16 @@ def criteria_apply(arr,inten):
     indexes = out_criteria(arr,inten)
     for index in indexes:
         arr_out.linked_array[index-1] = sorted([arr.linked_array[index-1,0],arr.linked_array[index,1]])
-
     return arr_out.sync_delete(indexes)
 
 
 '''process main function'''
 
 
-# def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
-#         features_raw = File(RAW).read(DATASET)
-#         features_aln = File(ALN).read(DATASET)
-#         distance_list = read_dataset(features_raw, features_aln, REF, DEV)
+# def find_dots_process(RAW, ALN, DATASET_RAW,DATASET_ALN, REF, DEV, BW, N_DOTS):
+#         features_raw = File(RAW).read(DATASET_RAW)
+#         features_aln = File(ALN).read(DATASET_ALN)
+#         distance_list = read_dataset(features_raw, features_aln, REF, DEV,limit=1000)
 
 #         distance_list_prepared = prepare_array(distance_list)
 #         raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -1047,10 +1181,8 @@ def criteria_apply(arr,inten):
 
 #         c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
 
-#         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
-#         peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-#         aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln)
+#         aln_peak_lists_raw,aln_peak_lists_aln,aln_kde_raw,aln_kde_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln,c_ds_raw,c_ds_aln,c_ds_raw_intens,c_ds_aln_intens)
 
 #         s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object')
 
@@ -1072,5 +1204,6 @@ def criteria_apply(arr,inten):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     main_window = MainWindow()
-    main_window.show()
+    main_window.showMaximized()
+
     sys.exit(app.exec_())
