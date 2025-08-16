@@ -21,6 +21,8 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabe
 from diptest import diptest
 from numba import jit
 
+import alignment
+
 """classes declaration"""
 
 
@@ -79,7 +81,7 @@ class WorkerSignals(QObject):
             peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
             peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = aligment.munkres_align(peak_lists_raw,
+            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = alignment.munkres_align(peak_lists_raw,
                                                                                                       peak_lists_aln,
                                                                                                       c_ds_raw,
                                                                                                       c_ds_aln,
