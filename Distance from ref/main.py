@@ -4,7 +4,7 @@ import sys
 from multiprocessing import Process, Queue
 from pathlib import Path
 from queue import Empty
-import aligment
+
 import h5py
 import numpy as np
 import pyqtgraph as pg
@@ -13,13 +13,13 @@ import yaml
 from IPython.external.qt_for_kernel import QtCore
 from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import QTimer, QObject, pyqtSignal
+from PyQt5.QtCore import QTimer, QObject, pyqtSignal, Qt, QThread
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
-    QFormLayout, QFileDialog, QAbstractItemView, QHeaderView, QTableWidgetItem
+    QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter, \
+    QHBoxLayout, QTreeWidget, QTreeWidgetItem, QProgressBar
 from diptest import diptest
 from numba import jit
-from tqdm import tqdm
-
 
 """classes declaration"""
 
@@ -29,7 +29,8 @@ class Const:
     RAW = None
     ALN = None
     CASH = None
-    DATASET = None
+    DATASET_RAW = None
+    DATASET_ALN = None
     REF = None
     DEV = None
     N_DOTS = None
@@ -40,7 +41,81 @@ class WorkerSignals(QObject):
     output = pyqtSignal(str)
     error = pyqtSignal(str)
     result = pyqtSignal(object)
+    finished = pyqtSignal()
+    progress = pyqtSignal(int)
+    create_pbar = pyqtSignal(tuple)
 
+    def find_dots_process(self):
+        try:
+
+            features_raw = File(Const.RAW).read(Const.DATASET_RAW)
+            features_aln = File(Const.ALN).read(Const.DATASET_ALN)
+
+            distance_list = read_dataset(self,features_raw, features_aln, Const.REF, Const.DEV)
+
+            distance_list_prepared = prepare_array(distance_list)
+            raw_concat, aln_concat, id_concat = distance_list_prepared
+
+            kde_x_raw, kde_y_raw = FFTKDE(bw=Const.BW, kernel='gaussian').fit(raw_concat).evaluate(Const.N_DOTS)
+            kde_x_aln, kde_y_aln = FFTKDE(bw=Const.BW, kernel='gaussian').fit(aln_concat).evaluate(Const.N_DOTS)
+
+            epsilon = np.max(kde_y_raw) * 0.01
+
+            center_r, left_r, right_r = peak_picking(kde_x_raw, kde_y_raw)
+            center_a, left_a, right_a = peak_picking(kde_x_aln, kde_y_aln)
+            # восстановим высоту пиков
+            max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
+                                                                                            kde_y_aln)
+
+            borders_r = np.stack((left_r, right_r), axis=1)
+            borders_a = np.stack((left_a, right_a), axis=1)
+            ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
+            ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
+
+            c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
+            c_ds_raw_intens, c_ds_aln_intens = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,
+                                                                                                    kde_y_aln)
+
+            peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
+            peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
+
+            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = aligment.munkres_align(peak_lists_raw,
+                                                                                                      peak_lists_aln,
+                                                                                                      c_ds_raw,
+                                                                                                      c_ds_aln,
+                                                                                                      c_ds_raw_intens,
+                                                                                                      c_ds_aln_intens)
+
+            s_p = np.array(
+                [stat_params_paired_single(x_el, y_el) for x_el, y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],
+                dtype='object')
+
+            ret = (
+                ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
+                        ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
+                        (aln_kde_aln,np.max(kde_y_aln),'raw_peaks','mult','vln','kde'),
+                        (aln_kde_raw, np.max(kde_y_aln), 'raw_peaks', 'mult', 'vln', 'kde'))),
+                #(c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
+                #(c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
+                ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
+                ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
+                ('stats_table',s_p)
+            )
+            print('_____________________')
+            print(s_p)
+
+            print('_____________________')
+            self.result.emit(ret)
+            self.finished.emit()
+
+        except Exception as error:
+
+            self.error.emit(str(error))
+            self.finished.emit()
+
+# class Worker_processing(QObject):
+
+        # return ret
 
 class StreamRedirect:
     def __init__(self, q):
@@ -186,7 +261,7 @@ class File:
         return self.real_path.exists()
 
     def read(self, dataset):
-        try:
+        try:# TODO: add regex for more flexible input
             with h5py.File(self.real_path, 'r') as f:
                 if dataset in f:
                     data = f[dataset][:]
@@ -217,6 +292,69 @@ class LogWidget(QtWidgets.QTextEdit):
         except Exception as e:
             print(e)
 
+class TreeWidget(QWidget):
+    path_signal = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+        # Создаем layout и tree widget
+        layout = QVBoxLayout(self)
+        self.tree = QTreeWidget()
+        self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree.itemDoubleClicked.connect(self.get_path)
+        layout.addWidget(self.tree)
+
+        self.tree.expandAll()
+        self.tree.setHeaderLabels(['Name','Type','Shape','DType'])
+
+        self.setLayout(layout)
+
+    def populate_tree(self,path):
+        def get_node(name, obj, indent='',parent=None):
+            """Helper function to recursively print group and dataset info."""
+            child = None
+            if isinstance(obj, h5py.Group):
+                if parent is not None:
+                    child = QTreeWidgetItem(parent)
+                    child.setText(0, name)
+                    child.setText(1, 'Group')
+                    child.setIcon(0, QIcon("folder_ico.png"))
+
+                for key, item in obj.items():
+                    get_node(key, item, indent + '  ',parent=child)
+
+            elif isinstance(obj, h5py.Dataset):
+                if parent is not None:
+                    child = QTreeWidgetItem(parent)
+                    child.setText(0, name)
+                    child.setText(1,'Dataset')
+                    child.setText(2,str(obj.shape))
+                    child.setText(3,str(obj.dtype))
+                    child.setIcon(0, QIcon("ds_ico.png"))
+
+        with h5py.File(path,'r') as f:
+            root = QTreeWidgetItem(self.tree)
+            root.setText(0,'root')
+            get_node('/',f,parent=root)
+
+    def get_path(self):
+        selection = self.tree.currentItem()
+        path = []
+        current = selection
+        while current is not None:
+            path.insert(0,current.text(0))
+            current = current.parent()
+
+        path_join = "/".join(path).replace('root//','')
+        self.path_signal.emit(path_join)
+        return path_join
+
+    def update_tree(self,path):
+        self.tree.clear()
+        self.populate_tree(path)
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -240,7 +378,14 @@ class MainWindow(QMainWindow):
         self.stats = StatGraphPage(self, title='Statistics(Unpaired)')
         self.tabs.addTab(self.stats, self.stats.title)
 
+        self.stats_p = StatGraphPage(self, title='Statistics(Paired)')
+        self.tabs.addTab(self.stats_p, self.stats_p.title)
 
+        self.table = TablePage(self,title ='Stat per peak',columns=6)
+        self.tabs.addTab(self.table, self.table.title)
+
+
+        self.table.set_title(['distance','var(raw)','var(aln)','is normal distributed?','neq_mean?','neq_var?'])
         self.signals = WorkerSignals()
         self.manager = ProcessManager(self.signals)
 
@@ -254,7 +399,7 @@ class MainWindow(QMainWindow):
         self.signals.result.connect(self.redirect_outputs)
 
     def redirect_outputs(self, ret):
-        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stats.add_plot_mul}
+        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stats.add_plot_mul, 'stats_p': self.stats_p.add_plot_mul,'stats_table':self.table.add_data}
         for output in ret:
             self.aval_func[output[0]](output[1])
 
@@ -291,8 +436,37 @@ class MainPage(QWidget):
         super().__init__()
         self.title = title
         self.parent = parent
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.splitter = QtWidgets.QSplitter(self)
+
+        self.main_layout = QHBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.main_splitter = QSplitter()
+
+        self.left_main_widget = QWidget()
+        self.right_main_widget = QWidget()
+
+        self.left_layout = QVBoxLayout()
+
+        self.right_layout = QVBoxLayout()
+
+        self.left_main_widget.setLayout(self.left_layout)
+        self.right_main_widget.setLayout(self.right_layout)
+
+        self.main_splitter.addWidget(self.left_main_widget)
+        self.main_splitter.addWidget(self.right_main_widget)
+
+        self.main_layout.addWidget(self.main_splitter)
+
+        self.left_splitter = QSplitter(Qt.Vertical)
+
+        self.raw_tree = TreeWidget()
+        self.aln_tree = TreeWidget()
+
+        self.left_splitter.addWidget(self.raw_tree)
+        self.left_splitter.addWidget(self.aln_tree)
+        self.left_layout.addWidget(self.left_splitter)
+
+        self.splitter = QSplitter()
         self.const = Const
 
         form_panel = QtWidgets.QWidget()
@@ -302,7 +476,7 @@ class MainPage(QWidget):
         config_panel = QtWidgets.QWidget()
         config_layout = QtWidgets.QVBoxLayout()
         config_panel.setLayout(config_layout)
-        self.setLayout(self.main_layout)
+        #self.setLayout(self.right_layout)
 
         # Raw
         self.raw_layout = QtWidgets.QHBoxLayout()
@@ -319,36 +493,71 @@ class MainPage(QWidget):
         self.aln_layout.addWidget(self.aln_filename)
         self.aln_layout.addWidget(self.aln_open_button)
         # ref and dev
-        self.dataset = QLineEdit()
+        self.dataset_raw = QLineEdit()
+        self.dataset_aln = QLineEdit()
+
         self.ref_set = QLineEdit()
+
+        self.raw_filename.setEnabled(False)
+        self.aln_filename.setEnabled(False)
+
         self.dev_set = QLineEdit()
         self.bw_set = QLineEdit()
         self.n_dots_set = QLineEdit()
+
         form_layout.addRow(QLabel("Raw data:"), self.raw_layout)
         form_layout.addRow(QLabel("Alignment data:"), self.aln_layout)
-        form_layout.addRow(QLabel("Dataset:"), self.dataset)
+        form_layout.addRow(QLabel("Dataset (raw):"), self.dataset_raw)
+        form_layout.addRow(QLabel("Dataset (aln):"), self.dataset_aln)
         form_layout.addRow(QLabel("Reference point:"), self.ref_set)
         form_layout.addRow(QLabel("Acceptable deviation for msalign:"), self.dev_set)
         form_layout.addRow(QLabel("Bandwidth:"), self.bw_set)
         form_layout.addRow(QLabel("Number of dots:"), self.n_dots_set)
 
-        self.config_button = QPushButton("Browse config")
+        self.config_button = QPushButton("Open config file")
         self.config_button.clicked.connect(lambda: self.open_config())
-        self.load_config_button = QPushButton("Load")
-        self.load_config_button.clicked.connect(lambda: self.save_config())
+        # self.load_config_button = QPushButton("Save configs")
+        # self.load_config_button.clicked.connect(lambda: self.save_config())
         self.calc_button = QPushButton("Calculate")
         config_layout.addWidget(self.config_button)
-        config_layout.addWidget(self.load_config_button)
+        # config_layout.addWidget(self.load_config_button)
         config_layout.addWidget(self.calc_button)
         self.calc_button.clicked.connect(lambda: self.signal())
-        self.calc_button.setEnabled(False)
+        # self.calc_button.setEnabled(False)
+        self.pbar_widget = QWidget()
+        self.pbar_layout = QFormLayout(self.pbar_widget)
+        self.pbar = QProgressBar()
+        self.pbar_label = QLabel("Spectra processing:")
+        self.pbar_layout.addRow(self.pbar_label,self.pbar)
         self.splitter.addWidget(form_panel)
         self.splitter.addWidget(config_panel)
-        self.main_layout.addWidget(self.splitter)
-        self.main_layout.addWidget(self.parent.console_log)
+        self.right_layout.addWidget(self.splitter)
+        self.right_layout.addWidget(self.parent.console_log)
 
+        self.raw_filename.textChanged.connect(lambda text: self.raw_tree.update_tree(text))
+        self.aln_filename.textChanged.connect(lambda text: self.aln_tree.update_tree(text))
+
+        self.raw_tree.path_signal.connect(lambda path: self.dataset_raw.setText(path))
+        self.aln_tree.path_signal.connect(lambda path: self.dataset_aln.setText(path))
+
+        self.right_layout.addWidget(self.pbar_widget)
+        self.pbar_widget.hide()
+
+        try:
+            with open("last_config.yaml", 'r', encoding='utf8') as f:
+                yaml_config = yaml.load(f, Loader=yaml.FullLoader)
+                self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
+                self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
+                self.ref_set.setText(str(yaml_config['REF']))
+                self.dev_set.setText(str(yaml_config['DEV']))
+                self.dataset_raw.setText(str(yaml_config['DATASET_R']))
+                self.dataset_aln.setText(str(yaml_config['DATESET_A']))
+                self.bw_set.setText(str(yaml_config['BW']))
+                self.n_dots_set.setText(str(yaml_config['NDOTS']))
+        except Exception as error:
+            print(error)
     def open_file(self, raw_filename):
-        filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "HDF (*.hdf,*.h5,,'*.hdf5');;All Files (*)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "HDF (*.hdf *.hdf5 *.h5);;All Files (*)")
         if not filename: return
         raw_filename.setText(filename)
 
@@ -356,47 +565,159 @@ class MainPage(QWidget):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "yaml (*.yaml);;All Files (*)")
         if not filename: return
         with open(filename, 'r', encoding='utf8') as f:
-            yaml_config = yaml.load(f, Loader=yaml.FullLoader)
-            self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
-            self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
-            self.ref_set.setText(str(yaml_config['REF']))
-            self.dev_set.setText(str(yaml_config['DEV']))
-            self.dataset.setText(str(yaml_config['DATASET']))
-            self.bw_set.setText(str(yaml_config['BW']))
-            self.n_dots_set.setText(str(yaml_config['NDOTS']))
+            try:
+                yaml_config = yaml.load(f, Loader=yaml.FullLoader)
+                self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
+                self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
+                self.ref_set.setText(str(yaml_config['REF']))
+                self.dev_set.setText(str(yaml_config['DEV']))
+                self.dataset_raw.setText(str(yaml_config['DATASET_R']))
+                self.dataset_aln.setText(str(yaml_config['DATASET_A']))
+                self.bw_set.setText(str(yaml_config['BW']))
+                self.n_dots_set.setText(str(yaml_config['NDOTS']))
+            except Exception as e:
+                print(e)
 
-
-    def save_config(self):
+    def Pbar_set_ranges(self, ranges):
+        self.pbar.setRange(*ranges)
+    def Pbar_forwarder(self, n):
+        self.pbar.setValue(n)
+    def signal(self):
+        self.pbar_widget.show()
         try:
             data = (self.raw_filename.text(),
                     self.aln_filename.text(),
                     self.ref_set.text(),
                     self.dev_set.text(),
-                    self.dataset.text(),
+                    self.dataset_raw.text(),
+                    self.dataset_aln.text(),
                     self.bw_set.text(),
                     self.n_dots_set.text())
             if '' in data:
                 raise Exception('Empty string')
-            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET, Const.BW, Const.N_DOTS = data[0], data[1], float(
+            else:
+
+                with open('last_config.yaml', 'w') as outfile:
+                    yaml.dump({
+                        'FILE_NAMES':(data[0],data[1]),
+                        'REF': float(data[2]),
+                        'DEV': float(data[3]),
+                        'DATASET_R':data[4],
+                        'DATASET_A':data[5],
+                        'BW':float(data[6]),
+                        'NDOTS':int(data[7])
+                    }, outfile, default_flow_style=False)
+            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET_RAW,Const.DATASET_ALN, Const.BW, Const.N_DOTS = data[0], data[1], float(
                 data[2]), float(
-                data[3]), data[4], float(data[5]), int(data[6])
-            self.calc_button.setEnabled(True)
+                data[3]), data[4],data[5], float(data[6]), int(data[7])
+            # self.calc_button.setEnabled(True)
         except Exception as e:
             print(e)
 
-    def signal(self):
-        self.parent.start_calc(target=find_dots_process, args=(self.const.RAW,
-                                                               self.const.ALN,
-                                                               self.const.DATASET,
-                                                               self.const.REF,
-                                                               self.const.DEV,
-                                                               self.const.BW,
-                                                               self.const.N_DOTS
-                                                               ))
+        self.thread = QThread()
+        self.processing = WorkerSignals()
+        self.processing.moveToThread(self.thread)
+        self.thread.started.connect(self.processing.find_dots_process)
+        self.processing.finished.connect(self.thread.quit)
+        self.processing.finished.connect(self.processing.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.processing.create_pbar.connect(self.Pbar_set_ranges)
+        self.processing.progress.connect(self.Pbar_forwarder)
+        self.thread.start()
+        self.config_button.setEnabled(False)
+        self.calc_button.setEnabled(False)
+        self.processing.result.connect(main_window.redirect_outputs)
+        self.processing.error.connect(main_window.console_log.updateText)
+        self.thread.finished.connect(
+            lambda: self.config_button.setEnabled(True)
+        )
+        self.thread.finished.connect(
+            lambda: self.calc_button.setEnabled(True)
+        )
+        self.processing.finished.connect(
+            lambda: self.pbar_label.setText("Process done")
+        )
+        self.thread.finished.connect(
+            lambda: self.pbar.hide()
+        )
+        self.processing.error.connect(
+            lambda: self.pbar_label.setText("Error occurred during processing")
+        )
+        self.processing.error.connect(
+            lambda: self.config_button.setEnabled(True)
+        )
+        self.processing.error.connect(
+            lambda: self.calc_button.setEnabled(True)
+        )
+        self.processing.error.connect(
+            lambda: self.pbar.hide()
+        )
+
+        # self.parent.start_calc(target=find_dots_process, args=(self.const.RAW,
+        #                                                        self.const.ALN,
+        #                                                        self.const.DATASET_RAW,
+        #                                                         self.const.DATASET_ALN,
+        #                                                        self.const.REF,
+        #                                                        self.const.DEV,
+        #                                                        self.const.BW,
+        #                                                        self.const.N_DOTS
+        #                                                        ))
+
+class TablePage(QWidget):
+    def __init__(self,parent,title='TablePage',columns=1):
+        super().__init__()
+        self.parent = parent
+        self.title = title
+        self.layout = QVBoxLayout()
+
+        self.splitter = QSplitter(Qt.Vertical)
+        self.table = QTableWidget()
+        self.aver_table = QTableWidget()
+
+        self.setLayout(self.layout)
+
+
+        self.splitter.addWidget(self.table)
+        self.splitter.addWidget(self.aver_table)
+
+        self.splitter.setSizes([int(self.height()*0.95),int(self.height()*0.05)])
+        self.layout.addWidget(self.splitter)
+        self.table.setColumnCount(columns)
+        self.aver_table.setColumnCount(columns)
+        self.aver_table.setRowCount(1)
+
+        self.aver_table.verticalHeader().setDefaultSectionSize(self.aver_table.height())
+
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.aver_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.table.itemSelectionChanged.connect(self.average_selected)
+
+    def set_title(self,title):
+        self.table.setHorizontalHeaderLabels(title)
+        self.aver_table.setHorizontalHeaderLabels(title)
+    def add_row(self,data):
+        row_index = self.table.rowCount()
+        self.table.insertRow(row_index)
+        for col,value in enumerate(data):
+            self.table.setItem(row_index, col, QTableWidgetItem(str(value)))
+
+    def add_data(self,data):
+        for line in data:
+            self.add_row(line)
+
+    def average_selected(self):
+        self.selected = self.table.selectedItems()
+        temp = np.array([el.text() for el in self.selected]).reshape(-1, 6).T
+        data = temp.astype(float).mean(axis=1)
+
+        for col,value in enumerate(data):
+            self.aver_table.setItem(0, col, QTableWidgetItem(str(value)))
 
 class GraphPage(QWidget):
     def __init__(self, parent, canvas_count=1, title='PlotPage', title_plots=None, x_labels=None, y_labels=None,
-                 color=(255, 255, 255), bg_color=(0, 0, 0)):
+                 color=(255, 255, 255), bg_color=(0, 0, 0),n_colors = 8):
         super().__init__()
 
         if x_labels is None: x_labels = ['x'] * canvas_count
@@ -408,6 +729,7 @@ class GraphPage(QWidget):
         self.parent = parent
         self.title = title
         self.plot_spaces = [pg.PlotWidget() for i in range(canvas_count)]
+        [pwid.addLegend(brush='black') for pwid in self.plot_spaces]
         self.layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.layout)
         for i in range(canvas_count):
@@ -417,7 +739,10 @@ class GraphPage(QWidget):
             self.plot_spaces[i].setLabel('bottom', x_labels[i])
             self.plot_spaces[i].setLabel('left', y_labels[i])
 
-    def add_plot(self, data, plot_name, color, canvas_name=None):
+        self.palette_colors =  [pg.intColor(i,hues=n_colors) for i in range(n_colors)]
+
+
+    def add_plot(self, data, plot_name, color='w', canvas_name=None):
         if canvas_name is None:
             plot_id = 0
         else:
@@ -426,22 +751,38 @@ class GraphPage(QWidget):
         self.plot_spaces[plot_id].plot(data[0], data[1], name=plot_name, pen=pen)
         self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
 
-    def add_line(self, data, y_max, color, canvas_name=None):
+    def add_line(self, data, y_max, color='w',canvas_name=None):
         try:
             if canvas_name is None:
                 plot_id = 0
             else:
                 plot_id = self.canvas_adj[canvas_name]
 
-            pen = pg.mkPen(color=color, style=QtCore.Qt.DashLine)
             y_min = 0
             x = np.column_stack([data,
                                  data,
-                                 np.full_like(data, np.nan)]).ravel()
+                                 np.full_like(data, np.nan)])
             y = np.column_stack([np.full_like(data, y_min),
                                  np.full_like(data, y_max),
-                                 np.full_like(data, np.nan)]).ravel()
-            self.plot_spaces[plot_id].plot(x, y, pen=pen)
+                                 np.full_like(data, np.nan)])
+
+            if color == 'mult':
+
+                length = x.shape[0]
+                indices = [np.arange(i,length,len(self.palette_colors)) for i in range(len(self.palette_colors))]
+
+                x_s = [np.take(x,idx,axis=0) for idx in indices]
+                y_s = [np.take(y,idy,axis=0) for idy in indices]
+                pens = [pg.mkPen(color=self.palette_colors[i%len(self.palette_colors)]) for i in range(y.shape[0])]
+
+                for figure_index in range(len(self.palette_colors)):
+                    self.plot_spaces[plot_id].plot(x_s[figure_index].ravel(),y_s[figure_index].ravel(),pen = pens[figure_index])
+                #self.plot_spaces[plot_id].plot(x,y,pen=pens)
+            else:
+                x = x.ravel()
+                y = y.ravel()
+                pen = pg.mkPen(color=color, style=QtCore.Qt.DashLine)
+                self.plot_spaces[plot_id].plot(x, y, pen=pen)
             self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
         except Exception as e:
             print(e)
@@ -462,9 +803,9 @@ class StatGraphPage(GraphPage):
         super().__init__(parent, canvas_count=4, title=title, title_plots=('DEV', 'MOD', 'SKEW', 'KURT'),
                          x_labels=x_labels, y_labels=y_labels, color=color, bg_color=bg_color)
 
-        self.table_p = pg.TableWidget()
+
         self.table_un = pg.TableWidget()  # сколько всего точек, медианное отклонение, число точек не мономодальных
-        self.table_list = {'paired': self.table_p,'unpaired': self.table_un}
+        self.table_list = {'unpaired': self.table_un}
 
         self.p = p_val
         self.table_data = np.zeros((3, 2))
@@ -477,7 +818,7 @@ class StatGraphPage(GraphPage):
         self.table_layout = QtWidgets.QHBoxLayout()
         self.layout.addLayout(self.table_layout)
         self.table_layout.addWidget(self.table_un)
-        self.table_layout.addWidget(self.table_p)
+
     def add_row(self,table_name,data):
         row_index = self.table_data[table_name].rowCount()
         self.table_data[table_name].insertRow(row_index)
@@ -490,22 +831,21 @@ class StatGraphPage(GraphPage):
     def add_plot_mul(self, ds):
         self.fixed_colors = [
             pg.mkColor('blue'),  # Синий
-            pg.mkColor('red'),  # Красный
-            pg.mkColor('green'),  # Зеленый
-            pg.mkColor('yellow'),  # Желтый
-            pg.mkColor('purple'),  # Фиолетовый
-            pg.mkColor('cyan'),  # Голубой
+            pg.mkColor('red')
         ]
+
+
         for n in range(len(ds)):
-            data = ds[n]
+            data = ds[n][0]
+            data_name = ds[n][1]
             ds_color = self.fixed_colors[n]
 
             self.table_data[0, n] = len(data[0])
 
-            self.add_plot(data[0], f'st_dev_{n}', ds_color, 'DEV')
-            self.add_plot(data[1], f'dip_{n}', ds_color, 'MOD')
-            self.add_plot(data[3], f'skew_{n}', ds_color, 'SKEW')
-            self.add_plot(data[4], f'kurt_{n}', ds_color, 'KURT')
+            self.add_plot(data[0], f'st dev {data_name}', ds_color, 'DEV')
+            self.add_plot(data[1], f'dip {data_name}', ds_color, 'MOD')
+            self.add_plot(data[3], f'skew {data_name}', ds_color, 'SKEW')
+            self.add_plot(data[4], f'kurt {data_name}', ds_color, 'KURT')
             self.table_data[1, n] = np.where(data[2] < self.p)[0].size
             self.table_data[2, n] = np.median(data[0])
         self.table_un.setData(self.table_data)
@@ -519,27 +859,23 @@ class StatGraphPage(GraphPage):
             plot_id = self.canvas_adj[canvas_name]
         pen = pg.mkPen(color=color)
         no_nan = lambda arr: arr[~np.isnan(arr)]
-        y, x = np.histogram(no_nan(data), bins=60)
+        y, x = np.histogram(no_nan(data), bins=1000)
 
         self.plot_spaces[plot_id].plot(x, y, stepMode=True, name=plot_name, pen=pen)
         self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
 
 
-
-
 '''functions declaration'''
 
 
-def peak_picking(X, Y, oversegmentation_filter=0, peak_location=1):
+def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
     n = X.size
     # Robust valley finding
-    h = np.concatenate(([-1], np.where(np.diff(Y) != 0)[0], [n - 1]))
-    g = (np.diff(Y[[h[1], *h[1:]]]) <= 0) & (np.diff(Y[[*h[1:], h[-1]]]) >= 0)
-
-    left_min = h[np.concatenate([g, [False]])] + 1
-    right_min = h[np.concatenate([[False], g])]
-    left_min = left_min[:-1]
-    right_min = right_min[1:]
+    valley_dots = np.concatenate((np.where(np.diff(Y) != 0)[0], [n-1]))
+    loc_min = np.diff(Y[valley_dots])
+    loc_min = (np.array([True,*(loc_min < 0)])) & np.array(([*(loc_min > 0),True]))
+    left_min = np.concatenate([[-1],valley_dots[:-1]])[loc_min][:-1] + 1
+    right_min = valley_dots[loc_min][1:]
     # Compute max and min for every peak
     size = left_min.shape
     val_max = np.empty(size)
@@ -551,27 +887,36 @@ def peak_picking(X, Y, oversegmentation_filter=0, peak_location=1):
         pos_peak[idx] = pp
 
     # Remove oversegmented peaks
-    while True:
+    if oversegmentation_filter:
+        while True:
+            peak_thld = val_max * peak_location - math.sqrt(np.finfo(float).eps)
+            pkX = np.empty(left_min.shape)
+
+            for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_thld)):
+                mask = Y[lm:rm] >= th
+                if np.sum(mask) == 0:
+                    pkX[idx]=np.nan
+                else:
+                    pkX[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
+            dpkX = np.concatenate(([np.inf], np.diff(pkX), [np.inf]))
+
+            j = np.where((dpkX[1:-1] <= oversegmentation_filter) & (dpkX[1:-1] <= dpkX[:-2]) & (dpkX[1:-1] < dpkX[2:]))[0]
+            if j.size == 0:
+                break
+            left_min = np.delete(left_min, j + 1)
+            right_min = np.delete(right_min, j)
+            val_max[j] = np.maximum(val_max[j], val_max[j + 1])
+            val_max = np.delete(val_max, j + 1)
+    else:
         peak_thld = val_max * peak_location - math.sqrt(np.finfo(float).eps)
         pkX = np.empty(left_min.shape)
 
         for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_thld)):
             mask = Y[lm:rm] >= th
             if np.sum(mask) == 0:
-                pkX[idx] = np.nan
+                pkX[idx]=np.nan
             else:
                 pkX[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
-        dpkX = np.concatenate(([np.inf], np.diff(pkX), [np.inf]))
-
-        j = np.where((dpkX[1:-1] <= oversegmentation_filter) & (dpkX[1:-1] <= dpkX[:-2]) & (dpkX[1:-1] < dpkX[2:]))[0]
-        if j.size == 0:
-            break
-        left_min = np.delete(left_min, j + 1)
-        right_min = np.delete(right_min, j)
-
-        val_max[j] = np.maximum(val_max[j], val_max[j + 1])
-        val_max = np.delete(val_max, j + 1)
-    # print(pkX,X[left_min],X[right_min])
     return pkX, X[left_min], X[right_min]
 
 
@@ -672,21 +1017,25 @@ def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0) -> [float, float
     return ref_index, dataset[ref_index]
 
 
-def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, limit=None):
+def read_dataset(self, dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, limit=None):
     """
     initial data verifying and recording into Dataset objects
     input - dataset_raw, dataset_aln - np.ndarray arrays with full recorded data,
           - limit - maximum number of mass spectra to be processed (for debugging use only, otherwise should be zero)
     return - (void function)
     """
-    if limit is None:
-        set_num = int(max(dataset_raw[0])) + 1
-    else:
-        set_num = int(limit)
+    start_index, end_index = int(min(dataset_raw[0])), int(max(dataset_raw[0]))
+    if limit is not None:
+        if start_index + limit <= end_index:
+            end_index = start_index + limit
+
+    set_num = end_index - start_index + 1
 
     dataset_list = np.empty((2, set_num), dtype=Dataset)
 
-    for index in tqdm(range(set_num), desc='Прогресс'):
+    self.create_pbar.emit((0,end_index-start_index))
+
+    for spec_n, index in enumerate(range(start_index,end_index+1)):
         index_raw, index_aln = get_index(dataset_raw, index), get_index(dataset_aln, index)
 
         data_raw_unsorted = dataset_raw[1:3, index_raw[0][0]:index_raw[0][-1] + 1]
@@ -711,6 +1060,7 @@ def read_dataset(dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, lim
 
         dataset_list[0, index] = np.array(checked_raw)  # - checked_raw.reference
         dataset_list[1, index] = np.array(checked_aln)  # - checked_aln.reference
+        self.progress.emit(spec_n)
 
     return dataset_list
 
@@ -723,20 +1073,53 @@ def prepare_array(distances):
     sorted = pre_sorted[:, pre_sorted[0].argsort()]
     return sorted
 
+def concover(arr1:np.ndarray,arr2:np.ndarray):
+    dev = lambda data: np.abs(data - np.median(data))
+    sq_sum = lambda data: np.sum(data**2)
+    dev1 = dev(arr1)
+    dev2 = dev(arr2)
+
+    all_devs = np.hstack((dev1, dev2))
+    ranks = stats.rankdata(all_devs)
+
+    rank1 = ranks[:len(dev1)]
+    rank2 = ranks[len(dev1):]
+
+    sum1 = sq_sum(rank1)
+    sum2 = sq_sum(rank2)
+
+    N = len(dev1)+len(dev2)
+    mean_rank = (N+1)/2
+
+    ss_between = (
+        len(dev1)*(np.mean(rank1)-mean_rank)**2 +
+        len(dev2)*(np.mean(rank2)-mean_rank)**2)
+
+    ss_total = np.sum((ranks-mean_rank)**2)
+
+    T = (N-1)*ss_between/ss_total
+    p_value = 1 - stats.chi2.cdf(T, 2)
+    return p_value
+
+
 # вычислить среднее и дисперсии, проверить нормальность, проверить гипотезы о значимости различия средних и дисперсий, возможно посчитать форму распределения
-def stat_params_paired(ds_raw, ds_aln, p_value=0.05):
-    mean_r, mean_a = np.mean(ds_raw), np.mean(ds_aln)
-    var_r, var_a = np.var(ds_raw), np.var(ds_aln)
+def stat_params_paired_single(peak_raw, peak_aln, p_value=0.05):
+    """paired peak comparison"""
 
-    neq_mean, neq_var = np.nan, np.nan
-    #kstest(data, 'norm', args=(np.mean(data), np.std(data)))
+    norm_var = lambda data: np.var(data-np.mean(data),ddof=1)
+    mean_r, mean_a = np.mean(peak_raw), np.mean(peak_aln)
+    var_r, var_a = norm_var(peak_raw), norm_var(peak_aln)
+
     check_normal_func = lambda data,p: stats.kstest(data,'norm',args=(np.mean(data),np.std(data)))[1]>p
-    check_normal = check_normal_func(ds_raw,p_value) & check_normal_func(ds_aln,p_value)
+    check_normal = check_normal_func(peak_raw,p_value) & check_normal_func(peak_aln,p_value)
     if check_normal:
-        neq_var = stats.levene(ds_raw, ds_aln)[1] < p_value
-        neq_mean = stats.ttest_ind(ds_raw, ds_aln,nan_policy='omit')[1] < p_value
+        neq_var = stats.levene(peak_raw, peak_aln)[1] < p_value
+        neq_mean = stats.ttest_ind(peak_raw, peak_aln,nan_policy='omit')[1] < p_value
+    else:
+        neq_mean = stats.mannwhitneyu(peak_raw, peak_aln)[1] < p_value
+        neq_var = stats.ansari(peak_raw, peak_aln)[1] < p_value
 
-    return mean_r - mean_a, var_r - var_a,check_normal, neq_mean, neq_var
+    return mean_r - mean_a, var_r, var_a,float(check_normal), float(neq_mean), float(neq_var)
 
 
 def stat_params_unpaired(ds):
@@ -750,7 +1133,7 @@ def moving_average(a, n=2):
     return ret[n - 1:] / n
 
 
-def out_criteria(arr, inten):
+def out_criteria(arr, inten):# TODO: add documentation (see TG for descr.)
     min_int = np.max(inten) * 0.01
     max_diff = 0.3
     width_eps = 0.3
@@ -758,7 +1141,6 @@ def out_criteria(arr, inten):
     int_criteria = abs(inten[:-1] / inten[1:] - 1) < max_diff
 
     width_criteria = np.diff(arr) / moving_average(np.diff(arr.linked_array).flatten()) <= width_eps
-    #print(int_criteria.shape, width_criteria.shape)
     second_or = np.full(arr.shape, False)
     second_or[1:] = np.logical_and(int_criteria, width_criteria)
 
@@ -770,62 +1152,61 @@ def criteria_apply(arr,inten):
     indexes = out_criteria(arr,inten)
     for index in indexes:
         arr_out.linked_array[index-1] = sorted([arr.linked_array[index-1,0],arr.linked_array[index,1]])
-
     return arr_out.sync_delete(indexes)
 
 
 '''process main function'''
 
 
-def find_dots_process(RAW, ALN, DATASET, REF, DEV, BW, N_DOTS):
-        features_raw = File(RAW).read(DATASET)
-        features_aln = File(ALN).read(DATASET)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV,limit = 100)
+# def find_dots_process(RAW, ALN, DATASET_RAW,DATASET_ALN, REF, DEV, BW, N_DOTS):
+#         features_raw = File(RAW).read(DATASET_RAW)
+#         features_aln = File(ALN).read(DATASET_ALN)
+#         distance_list = read_dataset(features_raw, features_aln, REF, DEV,limit=1000)
 
-        distance_list_prepared = prepare_array(distance_list)
-        raw_concat, aln_concat, id_concat = distance_list_prepared
+#         distance_list_prepared = prepare_array(distance_list)
+#         raw_concat, aln_concat, id_concat = distance_list_prepared
 
-        kde_x_raw, kde_y_raw = FFTKDE(bw=BW, kernel='gaussian').fit(raw_concat).evaluate(N_DOTS)
-        kde_x_aln, kde_y_aln = FFTKDE(bw=BW, kernel='gaussian').fit(aln_concat).evaluate(N_DOTS)
+#         kde_x_raw, kde_y_raw = FFTKDE(bw=BW, kernel='gaussian').fit(raw_concat).evaluate(N_DOTS)
+#         kde_x_aln, kde_y_aln = FFTKDE(bw=BW, kernel='gaussian').fit(aln_concat).evaluate(N_DOTS)
 
-        epsilon = np.max(kde_y_raw) * 0.01
+#         epsilon = np.max(kde_y_raw) * 0.01
 
-        center_r, left_r, right_r = peak_picking(kde_x_raw, kde_y_raw)
-        center_a, left_a, right_a = peak_picking(kde_x_aln, kde_y_aln)
-        # восстановим высоту пиков
-        max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
-                                                                                          kde_y_aln)
+#         center_r, left_r, right_r = peak_picking(kde_x_raw, kde_y_raw)
+#         center_a, left_a, right_a = peak_picking(kde_x_aln, kde_y_aln)
+#         # восстановим высоту пиков
+#         max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
+#                                                                                           kde_y_aln)
 
-        borders_r = np.stack((left_r, right_r), axis=1)
-        borders_a = np.stack((left_a, right_a), axis=1)
-        ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
-        ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
+#         borders_r = np.stack((left_r, right_r), axis=1)
+#         borders_a = np.stack((left_a, right_a), axis=1)
+#         ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
+#         ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
 
-        c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
+#         c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
 
-        peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
-        peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-        aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw[0], peak_lists_aln[0])
-        print(len(aln_peak_lists_raw),len(aln_peak_lists_aln))
+#         aln_peak_lists_raw,aln_peak_lists_aln,aln_kde_raw,aln_kde_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln,c_ds_raw,c_ds_aln,c_ds_raw_intens,c_ds_aln_intens)
 
-        s_p = np.array([stat_params_paired(x_el,y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],dtype='object').T
-        print(s_p)
-        s_p_names = np.array(['d_mean','d_var','is normal','eq_mean','eq_var'])
+#         s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object')
 
-        ret = (
-            ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
-                      ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
-                      (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
-                      (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
-            ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
-            ('stats_paired',(s_p, s_p_names))
-        )
+#         ret = (
+#             ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
+#                       ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
+#                       (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
+#                       (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
+#             ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
+#             ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
+#             ('stats_table',s_p)
+#         )
+#         print('_____________________')
+#         print(s_p)
 
-        return ret
+#         print('_____________________')
+#         return ret
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     main_window = MainWindow()
-    main_window.show()
+    main_window.showMaximized()
+
     sys.exit(app.exec_())
