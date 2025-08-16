@@ -1007,7 +1007,7 @@ def criteria_apply(arr,inten):
 def find_dots_process(RAW, ALN, DATASET_RAW,DATASET_ALN, REF, DEV, BW, N_DOTS):
         features_raw = File(RAW).read(DATASET_RAW)
         features_aln = File(ALN).read(DATASET_ALN)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV,limit=1000)
 
         distance_list_prepared = prepare_array(distance_list)
         raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -1027,10 +1027,13 @@ def find_dots_process(RAW, ALN, DATASET_RAW,DATASET_ALN, REF, DEV, BW, N_DOTS):
 
         c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
 
+        c_ds_raw_intens,c_ds_aln_intens = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,kde_y_aln)
+
+        print(type(c_ds_raw))
         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
         peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-        aln_peak_lists_raw,aln_peak_lists_aln,aln_kde_raw,aln_kde_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln,c_ds_raw,c_ds_aln)
+        aln_peak_lists_raw,aln_peak_lists_aln,aln_kde_raw,aln_kde_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln,c_ds_raw,c_ds_aln,c_ds_raw_intens,c_ds_aln_intens)
 
         s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object')
 
