@@ -572,7 +572,7 @@ class TablePage(QWidget):
 
 class GraphPage(QWidget):
     def __init__(self, parent, canvas_count=1, title='PlotPage', title_plots=None, x_labels=None, y_labels=None,
-                 color=(255, 255, 255), bg_color=(0, 0, 0)):
+                 color=(255, 255, 255), bg_color=(0, 0, 0),n_colors = 8):
         super().__init__()
 
         if x_labels is None: x_labels = ['x'] * canvas_count
@@ -594,8 +594,10 @@ class GraphPage(QWidget):
             self.plot_spaces[i].setLabel('bottom', x_labels[i])
             self.plot_spaces[i].setLabel('left', y_labels[i])
 
+        self.palette_colors =  [pg.intColor(i,hues=n_colors) for i in range(n_colors)]
 
-    def add_plot(self, data, plot_name, color, canvas_name=None):
+
+    def add_plot(self, data, plot_name, color='w', canvas_name=None):
         if canvas_name is None:
             plot_id = 0
         else:
@@ -604,22 +606,38 @@ class GraphPage(QWidget):
         self.plot_spaces[plot_id].plot(data[0], data[1], name=plot_name, pen=pen)
         self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
 
-    def add_line(self, data, y_max, color, canvas_name=None):
+    def add_line(self, data, y_max, color='w',canvas_name=None):
         try:
             if canvas_name is None:
                 plot_id = 0
             else:
                 plot_id = self.canvas_adj[canvas_name]
 
-            pen = pg.mkPen(color=color, style=QtCore.Qt.DashLine)
             y_min = 0
             x = np.column_stack([data,
                                  data,
-                                 np.full_like(data, np.nan)]).ravel()
+                                 np.full_like(data, np.nan)])
             y = np.column_stack([np.full_like(data, y_min),
                                  np.full_like(data, y_max),
-                                 np.full_like(data, np.nan)]).ravel()
-            self.plot_spaces[plot_id].plot(x, y, pen=pen)
+                                 np.full_like(data, np.nan)])
+
+            if color == 'mult':
+
+                length = x.shape[0]
+                indices = [np.arange(i,length,len(self.palette_colors)) for i in range(len(self.palette_colors))]
+
+                x_s = [np.take(x,idx,axis=0) for idx in indices]
+                y_s = [np.take(y,idy,axis=0) for idy in indices]
+                pens = [pg.mkPen(color=self.palette_colors[i%len(self.palette_colors)]) for i in range(y.shape[0])]
+
+                for figure_index in range(len(self.palette_colors)):
+                    self.plot_spaces[plot_id].plot(x_s[figure_index].ravel(),y_s[figure_index].ravel(),pen = pens[figure_index])
+                #self.plot_spaces[plot_id].plot(x,y,pen=pens)
+            else:
+                x = x.ravel()
+                y = y.ravel()
+                pen = pg.mkPen(color=color, style=QtCore.Qt.DashLine)
+                self.plot_spaces[plot_id].plot(x, y, pen=pen)
             self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
         except Exception as e:
             print(e)
@@ -989,7 +1007,7 @@ def criteria_apply(arr,inten):
 def find_dots_process(RAW, ALN, DATASET_RAW,DATASET_ALN, REF, DEV, BW, N_DOTS):
         features_raw = File(RAW).read(DATASET_RAW)
         features_aln = File(ALN).read(DATASET_ALN)
-        distance_list = read_dataset(features_raw, features_aln, REF, DEV,limit=500)
+        distance_list = read_dataset(features_raw, features_aln, REF, DEV)
 
         distance_list_prepared = prepare_array(distance_list)
         raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -1012,22 +1030,21 @@ def find_dots_process(RAW, ALN, DATASET_RAW,DATASET_ALN, REF, DEV, BW, N_DOTS):
         peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
         peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-        aln_peak_lists_raw,aln_peak_lists_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln)
+        aln_peak_lists_raw,aln_peak_lists_aln,aln_kde_raw,aln_kde_aln = aligment.munkres_align(peak_lists_raw, peak_lists_aln,c_ds_raw,c_ds_aln)
 
         s_p = np.array([stat_params_paired_single(x_el, y_el) for x_el,y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)], dtype='object')
 
         ret = (
             ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
                       ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
-                      (c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
-                      (c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
+                      (aln_kde_aln,np.max(kde_y_aln),'raw_peaks','mult','vln','kde'),
+                      (aln_kde_raw, np.max(kde_y_aln), 'raw_peaks', 'mult', 'vln', 'kde'))),
+                      #(c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
+                      #(c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
             ('stats', ((stat_params_unpaired(peak_lists_raw).T,'raw'), (stat_params_unpaired(peak_lists_aln).T,'aln'))),
             ('stats_p', ((stat_params_unpaired(aln_peak_lists_raw).T,'raw'), (stat_params_unpaired(aln_peak_lists_aln).T,'aln'))),
             ('stats_table',s_p)
         )
-        print('_____________________')
-        print(s_p)
-        print('_____________________')
         return ret
 
 if __name__ == '__main__':

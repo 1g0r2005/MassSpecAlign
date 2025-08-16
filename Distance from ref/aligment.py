@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-def munkres_align(x_arr,y_arr):
+def munkres_align(x_arr,y_arr,x_linked=None,y_linked=None):
 
     convert = lambda arr: np.array([np.array(el).mean() for el in arr])
     x, y = convert(x_arr), convert(y_arr)
@@ -17,6 +17,10 @@ def munkres_align(x_arr,y_arr):
     aln_x = [x_arr[i] for i in xind]
     aln_y = [y_arr[i] for i in yind]
 
+    if x_linked is not None and y_linked is not None:
+      aln_x_linked = np.asarray(x_linked)[xind]
+      aln_y_linked = np.asarray(y_linked)[yind]
+      return aln_x,aln_y,aln_x_linked,aln_y_linked
     return aln_x,aln_y
 
 
