@@ -553,7 +553,7 @@ class MainPage(QWidget):
                 self.ref_set.setText(str(yaml_config['REF']))
                 self.dev_set.setText(str(yaml_config['DEV']))
                 self.dataset_raw.setText(str(yaml_config['DATASET_R']))
-                self.dataset_aln.setText(str(yaml_config['DATESET_A']))
+                self.dataset_aln.setText(str(yaml_config['DATASET_A']))
                 self.bw_set.setText(str(yaml_config['BW']))
                 self.n_dots_set.setText(str(yaml_config['NDOTS']))
         except Exception as error:
@@ -582,10 +582,13 @@ class MainPage(QWidget):
 
     def Pbar_set_ranges(self, ranges):
         self.pbar.setRange(*ranges)
+        self.pbar.setValue(ranges[0])
     def Pbar_forwarder(self, n):
         self.pbar.setValue(n)
     def signal(self):
         self.pbar_widget.show()
+        self.pbar.show()
+        self.pbar_label.setText("Spectra processing:")
         try:
             data = (self.raw_filename.text(),
                     self.aln_filename.text(),
