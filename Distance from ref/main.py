@@ -4,6 +4,7 @@ import sys
 from multiprocessing import Process, Queue
 from pathlib import Path
 from queue import Empty
+import traceback
 
 import h5py
 import numpy as np
@@ -111,8 +112,8 @@ class WorkerSignals(QObject):
             self.finished.emit()
 
         except Exception as error:
-
-            self.error.emit(str(error))
+#            self.error.emit(str(error))
+            self.error.emit(traceback.format_exc()) #temporary
             self.finished.emit()
 
 # class Worker_processing(QObject):
