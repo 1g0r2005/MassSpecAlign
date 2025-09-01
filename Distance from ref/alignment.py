@@ -38,9 +38,10 @@ def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y):
 
     x_len,y_len = len(x),len(y)
     x_n,y_n = __equal_size(x,y)
-
+    print(f'xn: {x_n}')
+    print(f'yn: {y_n}')
     matrix = __make_matrix(x_n,y_n)
-
+    print(f'matrix shape {matrix.shape}')
     indexes = np.array(linear_sum_assignment(matrix))
     condition = (indexes[0,:] < x_len) & (indexes[1,:] < y_len)
     xind  = indexes[:,condition][0]
@@ -53,11 +54,18 @@ def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y):
     return aln_x,aln_y,aln_x_linked,aln_y_linked
 
 def __w(x, y,alpha_dist=0.1,alpha_int=3, k = 20):
-    scale = lambda var,alpha: np.exp(x*alpha)-1
+
+    x_arr = np.asarray(x)
+    y_arr = np.asarray(y)
+
+    x_linked = np.asarray(x.linked_array)
+    y_linked = np.asarray(y.linked_array)
+
+    scale = lambda var,alpha: np.exp(var*alpha)-1
     norm = lambda var,k: np.tanh(var/k)
 
-    dist_scaled = scale(x-y,alpha_dist)
-    dint_scaled = scale(x.linked_array-y.linked_array,alpha_int)
+    dist_scaled = scale(x_arr-y_arr,alpha_dist)
+    dint_scaled = scale(x_linked-y_linked,alpha_int)
 
     dist_norm = norm(dist_scaled,k)
     dint_norm = norm(dint_scaled,k)
@@ -76,13 +84,17 @@ def __equal_size(x,y):
 
     x_len,y_len = len(x),len(y)
     d_len = abs(x_len-y_len)
+
+    print(x_len,y_len)
     if x_len == y_len:
         return x,y
     elif x_len > y_len:
         print('11111111111')
         print(y.shape,y.linked_array.shape,np.full(d_len,np.inf).shape)
+        print(x.shape,change_linked(y,d_len).shape)
         return x, change_linked(y,d_len)#np.concatenate([y,np.full(x_len-y_len,np.inf)])
     else:
-        print('11111111111')
+        print('22222222222')
         print(y.shape, y.linked_array.shape, np.full(d_len, np.inf).shape)
+        print(change_linked(x, d_len).shape,y.shape)
         return change_linked(x,d_len),y#np.concatenate([x, np.full(y_len - x_len, np.inf)]),y
