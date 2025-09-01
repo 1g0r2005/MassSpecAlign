@@ -21,6 +21,8 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabe
 from diptest import diptest
 from numba import jit
 
+import alignment
+
 """classes declaration"""
 
 
@@ -79,13 +81,14 @@ class WorkerSignals(QObject):
             peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
             peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = aligment.munkres_align(peak_lists_raw,
+            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = alignment.munkres_align(peak_lists_raw,
                                                                                                       peak_lists_aln,
                                                                                                       c_ds_raw,
                                                                                                       c_ds_aln,
                                                                                                       c_ds_raw_intens,
                                                                                                       c_ds_aln_intens)
 
+            print(len(aln_peak_lists_aln))
             s_p = np.array(
                 [stat_params_paired_single(x_el, y_el) for x_el, y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],
                 dtype='object')
@@ -97,13 +100,18 @@ class WorkerSignals(QObject):
                         (aln_kde_raw, np.max(kde_y_aln), 'raw_peaks', 'mult', 'vln', 'kde'))),
                 #(c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
                 #(c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
-                ('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
-                ('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
+                #('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
+                #('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
+
+                ('stats',
+                 ((stat_params_unpaired(peak_lists_raw).T, 'raw'), (stat_params_unpaired(peak_lists_aln).T, 'aln'))),
+                ('stats_p', ((stat_params_unpaired(aln_peak_lists_raw).T, 'raw'),
+                             (stat_params_unpaired(aln_peak_lists_aln).T, 'aln'))),
                 ('stats_table',s_p)
             )
             print('_____________________')
-            print(s_p)
-
+            print(stat_params_unpaired(peak_lists_raw).T.shape)
+            print(stat_params_unpaired(peak_lists_raw).T[0])
             print('_____________________')
             self.result.emit(ret)
             self.finished.emit()
@@ -804,11 +812,11 @@ class StatGraphPage(GraphPage):
                          x_labels=x_labels, y_labels=y_labels, color=color, bg_color=bg_color)
 
 
-        self.table_un = pg.TableWidget()  # сколько всего точек, медианное отклонение, число точек не мономодальных
-        self.table_list = {'unpaired': self.table_un}
+        #self.table_un = pg.TableWidget()  # сколько всего точек, медианное отклонение, число точек не мономодальных
+        #self.table_list = {'unpaired': self.table_un}
 
         self.p = p_val
-        self.table_data = np.zeros((3, 2))
+        #self.table_data = np.zeros((3, 2))
 
         self.layout.setStretch(0, 1)  # Виджет 1
         self.layout.setStretch(1, 1)  # Виджет 2
@@ -817,7 +825,7 @@ class StatGraphPage(GraphPage):
 
         self.table_layout = QtWidgets.QHBoxLayout()
         self.layout.addLayout(self.table_layout)
-        self.table_layout.addWidget(self.table_un)
+        #self.table_layout.addWidget(self.table_un)
 
     def add_row(self,table_name,data):
         row_index = self.table_data[table_name].rowCount()
@@ -840,17 +848,17 @@ class StatGraphPage(GraphPage):
             data_name = ds[n][1]
             ds_color = self.fixed_colors[n]
 
-            self.table_data[0, n] = len(data[0])
+            #self.table_data[0, n] = len(data[0])
 
             self.add_plot(data[0], f'st dev {data_name}', ds_color, 'DEV')
             self.add_plot(data[1], f'dip {data_name}', ds_color, 'MOD')
             self.add_plot(data[3], f'skew {data_name}', ds_color, 'SKEW')
             self.add_plot(data[4], f'kurt {data_name}', ds_color, 'KURT')
-            self.table_data[1, n] = np.where(data[2] < self.p)[0].size
-            self.table_data[2, n] = np.median(data[0])
-        self.table_un.setData(self.table_data)
-        self.table_un.setHorizontalHeaderLabels([str(i) for i in range(len(ds))])
-        self.table_un.setVerticalHeaderLabels(['total', 'is multimodal', 'median std dev'])
+            #self.table_data[1, n] = np.where(data[2] < self.p)[0].size
+            #self.table_data[2, n] = np.median(data[0])
+        #self.table_un.setData(self.table_data)
+        #self.table_un.setHorizontalHeaderLabels([str(i) for i in range(len(ds))])
+        #self.table_un.setVerticalHeaderLabels(['total', 'is multimodal', 'median std dev'])
 
     def add_plot(self, data, plot_name, color, canvas_name=None):
         if canvas_name is None:
