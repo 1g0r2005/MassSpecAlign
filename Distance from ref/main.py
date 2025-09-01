@@ -4,6 +4,7 @@ import sys
 from multiprocessing import Process, Queue
 from pathlib import Path
 from queue import Empty
+import traceback
 
 import h5py
 import numpy as np
@@ -50,10 +51,10 @@ class WorkerSignals(QObject):
     def find_dots_process(self):
         try:
 
-            features_raw = File(Const.RAW).read(Const.DATASET_RAW)
-            features_aln = File(Const.ALN).read(Const.DATASET_ALN)
+            features_raw, attrs_raw = File(Const.RAW).read(Const.DATASET_RAW)
+            features_aln, attrs_aln = File(Const.ALN).read(Const.DATASET_ALN)
 
-            distance_list = read_dataset(self,features_raw, features_aln, Const.REF, Const.DEV)
+            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV)
 
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -117,13 +118,38 @@ class WorkerSignals(QObject):
             self.finished.emit()
 
         except Exception as error:
-
-            self.error.emit(str(error))
+#            self.error.emit(str(error))
+            self.error.emit(traceback.format_exc()) #temporary
             self.finished.emit()
 
 # class Worker_processing(QObject):
 
         # return ret
+class DatasetHeaders:
+    def __init__(self,attrs):
+        self.index = {}
+        self.name = [0]*len(attrs)
+        for index, name in enumerate(attrs):
+            self.name.append(name)
+            self.index[name]=index
+
+    def __call__(self,index_value):
+
+        if isinstance(index_value,list):
+            list_ind = [0]*len(self.name)
+            if isinstance(index_value[0],int):
+                for i,ind in enumerate(index_value):
+                    list_ind[i] = self.name[ind]
+            elif isinstance(index_value[0],str):
+                for i,ind in enumerate(index_value):
+                    list_ind[i]=self.index[ind]
+            return list_ind
+
+        else:
+            if isinstance(index_value,int):
+                return self.name[index_value]
+            elif isinstance(index_value,str):
+                return self.index[index_value]
 
 class StreamRedirect:
     def __init__(self, q):
@@ -273,7 +299,13 @@ class File:
             with h5py.File(self.real_path, 'r') as f:
                 if dataset in f:
                     data = f[dataset][:]
-                    return data
+                    attr = f[dataset].attrs["Column headers"]
+
+                    if len(attr) != f[dataset].shape[0] and len(attr) == f[dataset].shape[1]:
+                        data = data.T
+                    elif len(attr) != f[dataset].shape[0] and len(attr) != f[dataset].shape[1]:
+                        raise Exception("The number of columns does not match the number of headers")
+                    return data, attr
         except FileNotFoundError:
             print(f'File {self.real_path} not found')
             return None
@@ -559,7 +591,7 @@ class MainPage(QWidget):
                 self.ref_set.setText(str(yaml_config['REF']))
                 self.dev_set.setText(str(yaml_config['DEV']))
                 self.dataset_raw.setText(str(yaml_config['DATASET_R']))
-                self.dataset_aln.setText(str(yaml_config['DATESET_A']))
+                self.dataset_aln.setText(str(yaml_config['DATASET_A']))
                 self.bw_set.setText(str(yaml_config['BW']))
                 self.n_dots_set.setText(str(yaml_config['NDOTS']))
         except Exception as error:
@@ -588,10 +620,13 @@ class MainPage(QWidget):
 
     def Pbar_set_ranges(self, ranges):
         self.pbar.setRange(*ranges)
+        self.pbar.setValue(ranges[0])
     def Pbar_forwarder(self, n):
         self.pbar.setValue(n)
     def signal(self):
         self.pbar_widget.show()
+        self.pbar.show()
+        self.pbar_label.setText("Spectra processing:")
         try:
             data = (self.raw_filename.text(),
                     self.aln_filename.text(),
@@ -967,16 +1002,6 @@ def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool) -> (Dataset
         return arr_short, opt_long
 
 
-def get_index(dataset: np.ndarray, ds_id: int) -> np.ndarray:
-    """
-    input - dataset - np.ndarray with full recorded data from attached HDF file
-          - ds_id - int with id of dataset column
-    return - np.ndarray with indexes of columns with requested id
-    """
-    index_data = dataset[0]
-    return np.where(index_data == ds_id)
-
-
 def verify_datasets(data_1: LinkedList, data_2: LinkedList, threshold=1.0) -> (LinkedList, LinkedList):
     """
     input - data_1, data_2 - Dataset objects which need to be verified
@@ -1025,14 +1050,30 @@ def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0) -> [float, float
     return ref_index, dataset[ref_index]
 
 
-def read_dataset(self, dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DEV, limit=None):
+def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np.ndarray, attrs_aln: list, REF, DEV, limit=None):
     """
     initial data verifying and recording into Dataset objects
     input - dataset_raw, dataset_aln - np.ndarray arrays with full recorded data,
           - limit - maximum number of mass spectra to be processed (for debugging use only, otherwise should be zero)
     return - (void function)
     """
-    start_index, end_index = int(min(dataset_raw[0])), int(max(dataset_raw[0]))
+    row_raw = DatasetHeaders(attrs_raw)
+    row_aln = DatasetHeaders(attrs_aln)
+    if "mz" in attrs_raw:
+        mz_type = "mz"
+    else:
+        mz_type = "peak"
+    if "Intensity" not in attrs_raw:
+        for column in ["Area","SNR"]:
+            if column in attrs_raw:
+                int_type = column
+                break
+    else:
+        int_type = "Intensity"
+    index_row_raw = dataset_raw[row_raw("spectra_ind")]
+    index_row_raw = dataset_raw[row_aln("spectra_ind")]
+
+    start_index, end_index = int(min(index_row_raw)), int(max(index_row_raw))
     if limit is not None:
         if start_index + limit <= end_index:
             end_index = start_index + limit
@@ -1044,10 +1085,10 @@ def read_dataset(self, dataset_raw: np.ndarray, dataset_aln: np.ndarray, REF, DE
     self.create_pbar.emit((0,end_index-start_index))
 
     for spec_n, index in enumerate(range(start_index,end_index+1)):
-        index_raw, index_aln = get_index(dataset_raw, index), get_index(dataset_aln, index)
-
-        data_raw_unsorted = dataset_raw[1:3, index_raw[0][0]:index_raw[0][-1] + 1]
-        data_aln_unsorted = dataset_aln[1:3, index_aln[0][0]:index_aln[0][-1] + 1]
+        index_raw, index_aln = np.where(index_row_raw == index)[0], np.where(index_row_raw == index)[0]
+        # get_index(dataset_raw, index), get_index(dataset_aln, index)
+        data_raw_unsorted = dataset_raw[row_raw([mz_type,int_type]),index_raw[0]:index_raw[-1] + 1]
+        data_aln_unsorted = dataset_aln[row_aln([mz_type,int_type]),index_aln[0]:index_aln[-1] + 1]
 
         data_raw = data_raw_unsorted[:, np.argsort(data_raw_unsorted, axis=1)[0]]
         data_aln = data_aln_unsorted[:, np.argsort(data_aln_unsorted, axis=1)[0]]
@@ -1093,6 +1134,8 @@ def concover(arr1:np.ndarray,arr2:np.ndarray):
     rank1 = ranks[:len(dev1)]
     rank2 = ranks[len(dev1):]
 
+    sum1 = sq_sum(rank1)
+    sum2 = sq_sum(rank2)
 
     N = len(dev1)+len(dev2)
     mean_rank = (N+1)/2
@@ -1160,6 +1203,8 @@ def criteria_apply(arr,inten):
         arr_out.linked_array[index-1] = sorted([arr.linked_array[index-1,0],arr.linked_array[index,1]])
     return arr_out.sync_delete(indexes)
 
+
+'''process main function'''
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
