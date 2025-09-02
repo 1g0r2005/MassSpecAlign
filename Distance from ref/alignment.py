@@ -31,6 +31,13 @@ class LinkedList(np.ndarray):
             return LinkedList(new_self, new_linked_array)
         return new_self
 
+    def sync_reshape(self,size):
+        new_self = np.reshape(self, size)
+        if self.linked_array is not None:
+            new_linked_array = np.reshape(self.linked_array, size)
+            return LinkedList(new_self, new_linked_array)
+        return new_self
+
 def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y):
 
     convert = lambda arr,arr_linked: LinkedList(np.array([np.array(el).mean() for el in arr]),arr_linked)
@@ -64,8 +71,8 @@ def __w(x, y,alpha_dist=0.1,alpha_int=3, k = 20):
     scale = lambda var,alpha: np.exp(var*alpha)-1
     norm = lambda var,k: np.tanh(var/k)
 
-    dist_scaled = scale(x_arr-y_arr,alpha_dist)
-    dint_scaled = scale(x_linked-y_linked,alpha_int)
+    dist_scaled = scale(abs(x_arr-y_arr),alpha_dist)
+    dint_scaled = scale(abs(x_linked-y_linked),alpha_int)
 
     dist_norm = norm(dist_scaled,k)
     dint_norm = norm(dint_scaled,k)
@@ -75,7 +82,7 @@ def __w(x, y,alpha_dist=0.1,alpha_int=3, k = 20):
     return weight
 
 def __make_matrix(x,y):
-    matrix =  __w(x[:, np.newaxis], y[np.newaxis, :])
+    matrix =  __w(x.sync_reshape((-1,1)), y.sync_reshape((1,-1)))
     return matrix
 
 def __equal_size(x,y):

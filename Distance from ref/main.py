@@ -1,10 +1,10 @@
 import copy
 import math
 import sys
+import traceback
 from multiprocessing import Process, Queue
 from pathlib import Path
 from queue import Empty
-import traceback
 
 import h5py
 import numpy as np
@@ -54,7 +54,7 @@ class WorkerSignals(QObject):
             features_raw, attrs_raw = File(Const.RAW).read(Const.DATASET_RAW)
             features_aln, attrs_aln = File(Const.ALN).read(Const.DATASET_ALN)
 
-            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV)
+            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV,limit=1000)
 
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -268,6 +268,13 @@ class LinkedList(np.ndarray):
         new_self = np.delete(self, index)
         if self.linked_array is not None:
             new_linked_array = np.delete(self.linked_array, index, axis=0)
+            return LinkedList(new_self, new_linked_array)
+        return new_self
+
+    def sync_reshape(self,size):
+        new_self = np.reshape(self, size)
+        if self.linked_array is not None:
+            new_linked_array = np.reshape(self.linked_array, size)
             return LinkedList(new_self, new_linked_array)
         return new_self
 
