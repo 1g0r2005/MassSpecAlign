@@ -54,7 +54,7 @@ class WorkerSignals(QObject):
             features_raw, attrs_raw = File(Const.RAW).read(Const.DATASET_RAW)
             features_aln, attrs_aln = File(Const.ALN).read(Const.DATASET_ALN)
 
-            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV,limit=1000)
+            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV)
 
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -87,7 +87,8 @@ class WorkerSignals(QObject):
                                                                                                       c_ds_raw,
                                                                                                       c_ds_aln,
                                                                                                       c_ds_raw_intens,
-                                                                                                      c_ds_aln_intens)
+                                                                                                      c_ds_aln_intens,
+                                                                                                       skip_fraction=0.1,skip_level=0.9)
 
             print(len(aln_peak_lists_aln))
             s_p = np.array(
