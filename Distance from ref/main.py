@@ -1,3 +1,7 @@
+import os
+
+os.environ['PYQTGRAPH_QT_LIB'] = 'PyQt5'
+
 import copy
 import math
 import sys
@@ -994,6 +998,7 @@ def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool) -> (Dataset
     for i in shift_array:
         fit_score = np.mean((arr_short - arr_long[i:i + size]) ** 2)
         score_array[i] = fit_score
+
     opt_shift = np.where(score_array == score_array.min())[0][0]
     opt_long = arr_long[opt_shift:opt_shift + size]
     if flag:
@@ -1070,7 +1075,7 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
                 break
     else:
         int_type = "Intensity"
-    index_row_raw = dataset_raw[row_raw("spectra_ind")]
+
     index_row_raw = dataset_raw[row_aln("spectra_ind")]
 
     start_index, end_index = int(min(index_row_raw)), int(max(index_row_raw))
@@ -1081,6 +1086,7 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
     set_num = end_index - start_index + 1
 
     dataset_list = np.empty((2, set_num), dtype=Dataset)
+    dataset_list_mask = np.full((set_num,), dtype=bool,fill_value=False)
 
     self.create_pbar.emit((0,end_index-start_index))
 
@@ -1090,6 +1096,10 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
         data_raw_unsorted = dataset_raw[row_raw([mz_type,int_type]),index_raw[0]:index_raw[-1] + 1]
         data_aln_unsorted = dataset_aln[row_aln([mz_type,int_type]),index_aln[0]:index_aln[-1] + 1]
 
+        if data_raw_unsorted.size == 0 or data_aln_unsorted.size == 0:
+            print(f'NoData Error with id {spec_n}, raw: {data_raw_unsorted.size}, aln: {data_aln_unsorted.size}')
+            continue
+
         data_raw = data_raw_unsorted[:, np.argsort(data_raw_unsorted, axis=1)[0]]
         data_aln = data_aln_unsorted[:, np.argsort(data_aln_unsorted, axis=1)[0]]
 
@@ -1098,6 +1108,7 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
 
         data_raw_linked = Dataset(data_raw_mz, data_raw_int)
         data_aln_linked = Dataset(data_aln_mz, data_aln_int)
+
 
         checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
 
@@ -1109,14 +1120,20 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
 
         dataset_list[0, index] = np.array(checked_raw)  # - checked_raw.reference
         dataset_list[1, index] = np.array(checked_aln)  # - checked_aln.reference
+
+        dataset_list_mask[index] = True
+
         self.progress.emit(spec_n)
 
-    return dataset_list
+    dataset_list_filtered = dataset_list[:,dataset_list_mask]
+    return dataset_list_filtered
 
 
 def prepare_array(distances):
     """prepare distances dataset"""
-    concatenated = np.array([np.concatenate(sub) for sub in distances])
+
+    concatenated_list = [np.concatenate(sub) for sub in distances]
+    concatenated = np.array(concatenated_list)
     indexes = np.repeat(np.arange(len(distances[0])), [len(sub_arr) for sub_arr in distances[0]])
     pre_sorted = np.vstack((concatenated, indexes))
     sorted = pre_sorted[:, pre_sorted[0].argsort()]
@@ -1208,6 +1225,8 @@ def criteria_apply(arr,inten):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+    app_icon = QIcon('main_ico.png')
+    app.setWindowIcon(app_icon)
     main_window = MainWindow()
     main_window.showMaximized()
 
