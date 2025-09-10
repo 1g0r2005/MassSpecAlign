@@ -38,7 +38,7 @@ class LinkedList(np.ndarray):
             return LinkedList(new_self, new_linked_array)
         return new_self
 
-def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=None,skip_level=None):
+def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=0.1,skip_level=0.9):
 
     convert = lambda arr,arr_linked: LinkedList(np.array([np.array(el).mean() for el in arr]),arr_linked)
     x, y = convert(x_arr,intens_x), convert(y_arr,intens_y)
@@ -60,7 +60,7 @@ def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=
     aln_y_linked = np.asarray(y_linked)[yind]
     return aln_x,aln_y,aln_x_linked,aln_y_linked
 
-def __w(x, y,alpha_dist=0.1,alpha_int=1, k = 20):
+def __w(x, y,alpha_dist=1,alpha_int=1, k = 20):
 
     x_arr = np.asarray(x)
     y_arr = np.asarray(y)
@@ -93,16 +93,9 @@ def __equal_size(x,y):
     x_len,y_len = len(x),len(y)
     d_len = abs(x_len-y_len)
 
-    print(x_len,y_len)
     if x_len == y_len:
         return x,y
     elif x_len > y_len:
-        print('11111111111')
-        print(y.shape,y.linked_array.shape,np.full(d_len,np.inf).shape)
-        print(x.shape,change_linked(y,d_len).shape)
         return x, change_linked(y,d_len)#np.concatenate([y,np.full(x_len-y_len,np.inf)])
     else:
-        print('22222222222')
-        print(y.shape, y.linked_array.shape, np.full(d_len, np.inf).shape)
-        print(change_linked(x, d_len).shape,y.shape)
         return change_linked(x,d_len),y#np.concatenate([x, np.full(y_len - x_len, np.inf)]),y

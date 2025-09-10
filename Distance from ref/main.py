@@ -87,8 +87,7 @@ class WorkerSignals(QObject):
                                                                                                       c_ds_raw,
                                                                                                       c_ds_aln,
                                                                                                       c_ds_raw_intens,
-                                                                                                      c_ds_aln_intens,
-                                                                                                       skip_fraction=0.1,skip_level=0.9)
+                                                                                                      c_ds_aln_intens)
 
             print(len(aln_peak_lists_aln))
             s_p = np.array(
@@ -1079,7 +1078,7 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
     else:
         int_type = "Intensity"
     index_row_raw = dataset_raw[row_raw("spectra_ind")]
-    index_row_raw = dataset_raw[row_aln("spectra_ind")]
+    index_row_aln = dataset_aln[row_aln("spectra_ind")]
 
     start_index, end_index = int(min(index_row_raw)), int(max(index_row_raw))
     if limit is not None:
@@ -1093,7 +1092,7 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
     self.create_pbar.emit((0,end_index-start_index))
 
     for spec_n, index in enumerate(range(start_index,end_index+1)):
-        index_raw, index_aln = np.where(index_row_raw == index)[0], np.where(index_row_raw == index)[0]
+        index_raw, index_aln = np.where(index_row_raw == index)[0], np.where(index_row_aln == index)[0]
         # get_index(dataset_raw, index), get_index(dataset_aln, index)
         data_raw_unsorted = dataset_raw[row_raw([mz_type,int_type]),index_raw[0]:index_raw[-1] + 1]
         data_aln_unsorted = dataset_aln[row_aln([mz_type,int_type]),index_aln[0]:index_aln[-1] + 1]
