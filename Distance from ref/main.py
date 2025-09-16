@@ -58,7 +58,7 @@ class WorkerSignals(QObject):
             features_raw, attrs_raw = File(Const.RAW).read(Const.DATASET_RAW)
             features_aln, attrs_aln = File(Const.ALN).read(Const.DATASET_ALN)
 
-            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV)
+            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV,limit=1000)
 
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -66,7 +66,6 @@ class WorkerSignals(QObject):
             kde_x_raw, kde_y_raw = FFTKDE(bw=Const.BW, kernel='gaussian').fit(raw_concat).evaluate(Const.N_DOTS)
             kde_x_aln, kde_y_aln = FFTKDE(bw=Const.BW, kernel='gaussian').fit(aln_concat).evaluate(Const.N_DOTS)
 
-            epsilon = np.max(kde_y_raw) * 0.01
 
             center_r, left_r, right_r = peak_picking(kde_x_raw, kde_y_raw)
             center_a, left_a, right_a = peak_picking(kde_x_aln, kde_y_aln)
@@ -80,7 +79,7 @@ class WorkerSignals(QObject):
             ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
 
             c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
-            c_ds_raw_intens, c_ds_aln_intens = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,
+            c_ds_raw_intensity, c_ds_aln_intensity = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,
                                                                                                     kde_y_aln)
 
             peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
@@ -90,8 +89,8 @@ class WorkerSignals(QObject):
                                                                                                       peak_lists_aln,
                                                                                                       c_ds_raw,
                                                                                                       c_ds_aln,
-                                                                                                      c_ds_raw_intens,
-                                                                                                      c_ds_aln_intens)
+                                                                                                      c_ds_raw_intensity,
+                                                                                                      c_ds_aln_intensity)
 
             print(len(aln_peak_lists_aln))
             s_p = np.array(
@@ -189,8 +188,6 @@ class ProcessManager:
         if target_name in self.process_set:
             try:
                 process.join()
-                if len(self.process_set) == 0:
-                    self.shared_memory.unlink()
             except Exception as e:
                 self.error_q.put(e)
         else:
@@ -348,20 +345,20 @@ class TreeWidget(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.layout = QVBoxLayout(self)
+        self.tree = QTreeWidget()
         self.initUI()
 
     def initUI(self):
         # Создаем layout и tree widget
-        layout = QVBoxLayout(self)
-        self.tree = QTreeWidget()
         self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
         self.tree.itemDoubleClicked.connect(self.get_path)
-        layout.addWidget(self.tree)
+        self.layout.addWidget(self.tree)
 
         self.tree.expandAll()
         self.tree.setHeaderLabels(['Name','Type','Shape','DType'])
 
-        self.setLayout(layout)
+        self.setLayout(self.layout)
 
     def populate_tree(self,path):
         def get_node(name, obj, indent='',parent=None):
@@ -449,6 +446,7 @@ class MainWindow(QMainWindow):
         # self.signals.result.connect(lambda ds: self.graph.add_plot_mul(ds))
         self.signals.result.connect(self.redirect_outputs)
 
+
     def redirect_outputs(self, ret):
         self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stats.add_plot_mul, 'stats_p': self.stats_p.add_plot_mul,'stats_table':self.table.add_data}
         for output in ret:
@@ -485,6 +483,10 @@ class MainWindow(QMainWindow):
 class MainPage(QWidget):
     def __init__(self, parent, title):
         super().__init__()
+
+        self.thread = QThread()
+        self.processing = WorkerSignals()
+
         self.title = title
         self.parent = parent
 
@@ -668,8 +670,7 @@ class MainPage(QWidget):
         except Exception as e:
             print(e)
 
-        self.thread = QThread()
-        self.processing = WorkerSignals()
+
         self.processing.moveToThread(self.thread)
         self.thread.started.connect(self.processing.find_dots_process)
         self.processing.finished.connect(self.thread.quit)
@@ -706,16 +707,6 @@ class MainPage(QWidget):
         self.processing.error.connect(
             lambda: self.pbar.hide()
         )
-
-        # self.parent.start_calc(target=find_dots_process, args=(self.const.RAW,
-        #                                                        self.const.ALN,
-        #                                                        self.const.DATASET_RAW,
-        #                                                         self.const.DATASET_ALN,
-        #                                                        self.const.REF,
-        #                                                        self.const.DEV,
-        #                                                        self.const.BW,
-        #                                                        self.const.N_DOTS
-        #                                                        ))
 
 class TablePage(QWidget):
     def __init__(self,parent,title='TablePage',columns=1):
@@ -762,8 +753,8 @@ class TablePage(QWidget):
             self.add_row(line)
 
     def average_selected(self):
-        self.selected = self.table.selectedItems()
-        temp = np.array([el.text() for el in self.selected]).reshape(-1, 6).T
+        selected = self.table.selectedItems()
+        temp = np.array([el.text() for el in selected]).reshape(-1, 6).T
         data = temp.astype(float).mean(axis=1)
 
         for col,value in enumerate(data):
@@ -771,8 +762,16 @@ class TablePage(QWidget):
 
 class GraphPage(QWidget):
     def __init__(self, parent, canvas_count=1, title='PlotPage', title_plots=None, x_labels=None, y_labels=None,
-                 color=(255, 255, 255), bg_color=(0, 0, 0),n_colors = 8):
+                 color=(255, 255, 255), bg_color=(0, 0, 0),n_colors = 8,autoSize = True):
         super().__init__()
+        self.autoSize = autoSize
+        self.bg_color = bg_color
+        self.color = color
+
+        self.fixed_colors = [
+            pg.mkColor('blue'),  # Синий
+            pg.mkColor('red')
+        ]
 
         if x_labels is None: x_labels = ['x'] * canvas_count
         if y_labels is None: y_labels = ['y'] * canvas_count
@@ -782,8 +781,9 @@ class GraphPage(QWidget):
 
         self.parent = parent
         self.title = title
-        self.plot_spaces = [pg.PlotWidget() for i in range(canvas_count)]
-        [pwid.addLegend(brush='black') for pwid in self.plot_spaces]
+        self.plot_spaces = [pg.PlotWidget() for _ in range(canvas_count)]
+        [self.pyqt_settings(pw_id) for pw_id in self.plot_spaces]
+
         self.layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.layout)
         for i in range(canvas_count):
@@ -795,6 +795,18 @@ class GraphPage(QWidget):
 
         self.palette_colors =  [pg.intColor(i,hues=n_colors) for i in range(n_colors)]
 
+
+    def pyqt_settings(self,plot_widget):
+        plot_widget.addLegend(brush='black')
+        plot_widget.setMouseEnabled(y=False, x=True)
+
+        vb = plot_widget.getViewBox()
+
+        # Включить автомасштабирование по Y
+        if self.autoSize:
+            vb.enableAutoRange(axis='y')
+        # Установить видимое автомасштабирование
+            vb.setAutoVisible(y=True)
 
     def add_plot(self, data, plot_name, color='w', canvas_name=None):
         if canvas_name is None:
@@ -854,8 +866,8 @@ class GraphPage(QWidget):
 class StatGraphPage(GraphPage):
     def __init__(self, parent, title='StatPage', x_labels=None, y_labels=None,
                  color=(255, 255, 255), bg_color=(0, 0, 0), p_val=0.05):
-        super().__init__(parent, canvas_count=4, title=title, title_plots=('DEV', 'MOD', 'SKEW', 'KURT'),
-                         x_labels=x_labels, y_labels=y_labels, color=color, bg_color=bg_color)
+        super().__init__(parent, canvas_count=4, title=title, title_plots=('std_dev', 'modality (dip test)', 'skewness', 'kurtosis'),
+                         x_labels=x_labels, y_labels=y_labels, color=color, bg_color=bg_color,autoSize=False)
 
 
         #self.table_un = pg.TableWidget()  # сколько всего точек, медианное отклонение, число точек не мономодальных
@@ -883,10 +895,7 @@ class StatGraphPage(GraphPage):
             self.add_row(table_name,line)
 
     def add_plot_mul(self, ds):
-        self.fixed_colors = [
-            pg.mkColor('blue'),  # Синий
-            pg.mkColor('red')
-        ]
+
 
 
         for n in range(len(ds)):
@@ -896,10 +905,10 @@ class StatGraphPage(GraphPage):
 
             #self.table_data[0, n] = len(data[0])
 
-            self.add_plot(data[0], f'st dev {data_name}', ds_color, 'DEV')
-            self.add_plot(data[1], f'dip {data_name}', ds_color, 'MOD')
-            self.add_plot(data[3], f'skew {data_name}', ds_color, 'SKEW')
-            self.add_plot(data[4], f'kurt {data_name}', ds_color, 'KURT')
+            self.add_plot(data[0], f'st dev {data_name}', ds_color, 'std_dev')
+            self.add_plot(data[1], f'dip {data_name}', ds_color, 'modality (dip test)')
+            self.add_plot(data[3], f'skew {data_name}', ds_color, 'skewness')
+            self.add_plot(data[4], f'kurt {data_name}', ds_color, 'kurtosis')
             #self.table_data[1, n] = np.where(data[2] < self.p)[0].size
             #self.table_data[2, n] = np.median(data[0])
         #self.table_un.setData(self.table_data)
@@ -940,21 +949,21 @@ def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
         val_max[idx] = vm
         pos_peak[idx] = pp
 
-    # Remove oversegmented peaks
+    # Remove over-segmented peaks
     if oversegmentation_filter:
         while True:
-            peak_thld = val_max * peak_location - math.sqrt(np.finfo(float).eps)
-            pkX = np.empty(left_min.shape)
+            peak_threshold = val_max * peak_location - math.sqrt(np.finfo(float).eps)
+            pk_x = np.empty(left_min.shape)
 
-            for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_thld)):
+            for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_threshold)):
                 mask = Y[lm:rm] >= th
                 if np.sum(mask) == 0:
-                    pkX[idx]=np.nan
+                    pk_x[idx]=np.nan
                 else:
-                    pkX[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
-            dpkX = np.concatenate(([np.inf], np.diff(pkX), [np.inf]))
+                    pk_x[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
+            dpk_x = np.concatenate(([np.inf], np.diff(pk_x), [np.inf]))
 
-            j = np.where((dpkX[1:-1] <= oversegmentation_filter) & (dpkX[1:-1] <= dpkX[:-2]) & (dpkX[1:-1] < dpkX[2:]))[0]
+            j = np.where((dpk_x[1:-1] <= oversegmentation_filter) & (dpk_x[1:-1] <= dpk_x[:-2]) & (dpk_x[1:-1] < dpk_x[2:]))[0]
             if j.size == 0:
                 break
             left_min = np.delete(left_min, j + 1)
@@ -962,16 +971,16 @@ def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
             val_max[j] = np.maximum(val_max[j], val_max[j + 1])
             val_max = np.delete(val_max, j + 1)
     else:
-        peak_thld = val_max * peak_location - math.sqrt(np.finfo(float).eps)
-        pkX = np.empty(left_min.shape)
+        peak_threshold = val_max * peak_location - math.sqrt(np.finfo(float).eps)
+        pk_x = np.empty(left_min.shape)
 
-        for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_thld)):
+        for idx, [lm, rm, th] in enumerate(zip(left_min, right_min, peak_threshold)):
             mask = Y[lm:rm] >= th
             if np.sum(mask) == 0:
-                pkX[idx]=np.nan
+                pk_x[idx]=np.nan
             else:
-                pkX[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
-    return pkX, X[left_min], X[right_min]
+                pk_x[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
+    return pk_x, X[left_min], X[right_min]
 
 
 @jit(nopython=True)
@@ -1068,8 +1077,12 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
           - limit - maximum number of mass spectra to be processed (for debugging use only, otherwise should be zero)
     return - (void function)
     """
+
     row_raw = DatasetHeaders(attrs_raw)
     row_aln = DatasetHeaders(attrs_aln)
+
+    int_type = None
+
     if "mz" in attrs_raw:
         mz_type = "mz"
     else:
@@ -1081,6 +1094,10 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
                 break
     else:
         int_type = "Intensity"
+
+    if int_type is None:
+        raise Exception('Intensity type not stated in attrs_raw, check file input')
+
     index_row_raw = dataset_raw[row_raw("spectra_ind")]
     index_row_aln = dataset_aln[row_aln("spectra_ind")]
 
@@ -1130,12 +1147,12 @@ def prepare_array(distances):
     concatenated = np.array([np.concatenate(sub) for sub in distances])
     indexes = np.repeat(np.arange(len(distances[0])), [len(sub_arr) for sub_arr in distances[0]])
     pre_sorted = np.vstack((concatenated, indexes))
-    sorted = pre_sorted[:, pre_sorted[0].argsort()]
-    return sorted
+    result = pre_sorted[:, pre_sorted[0].argsort()]
+    return result
 
 def concover(arr1:np.ndarray,arr2:np.ndarray):
     dev = lambda data: np.abs(data - np.median(data))
-    sq_sum = lambda data: np.sum(data**2)
+
     dev1 = dev(arr1)
     dev2 = dev(arr2)
 
@@ -1145,11 +1162,8 @@ def concover(arr1:np.ndarray,arr2:np.ndarray):
     rank1 = ranks[:len(dev1)]
     rank2 = ranks[len(dev1):]
 
-    sum1 = sq_sum(rank1)
-    sum2 = sq_sum(rank2)
-
-    N = len(dev1)+len(dev2)
-    mean_rank = (N+1)/2
+    n = len(dev1)+len(dev2)
+    mean_rank = (n+1)/2
 
     ss_between = (
         len(dev1)*(np.mean(rank1)-mean_rank)**2 +
@@ -1157,8 +1171,8 @@ def concover(arr1:np.ndarray,arr2:np.ndarray):
 
     ss_total = np.sum((ranks-mean_rank)**2)
 
-    T = (N-1)*ss_between/ss_total
-    p_value = 1 - stats.chi2.cdf(T, 2)
+    t = (n-1)*ss_between/ss_total
+    p_value = 1 - stats.chi2.cdf(t, 2)
     return p_value
 
 
@@ -1193,29 +1207,25 @@ def moving_average(a, n=2):
     return ret[n - 1:] / n
 
 
-def out_criteria(arr, inten):# TODO: add documentation (see TG for descr.)
-    min_int = np.max(inten) * 0.01
-    max_diff = 0.3
-    width_eps = 0.3
-    first_or = inten < min_int
-    int_criteria = abs(inten[:-1] / inten[1:] - 1) < max_diff
+def out_criteria(mz, intensity, int_threshold = 0.01, max_diff = 0.3, width_eps = 0.1):# TODO: add documentation (see TG for descr.)
+    min_int = np.max(intensity) * int_threshold
+    first_or = intensity < min_int
+    int_criteria = abs(intensity[:-1] / intensity[1:] - 1) < max_diff
 
-    width_criteria = np.diff(arr) / moving_average(np.diff(arr.linked_array).flatten()) <= width_eps
-    second_or = np.full(arr.shape, False)
+    width_criteria = np.diff(mz) / moving_average(np.diff(mz.linked_array).flatten()) <= width_eps
+    second_or = np.full(mz.shape, False)
     second_or[1:] = np.logical_and(int_criteria, width_criteria)
 
     return np.where(np.logical_or(first_or, second_or))[0]
 
 
-def criteria_apply(arr,inten):
+def criteria_apply(arr, intensity):
     arr_out = copy.deepcopy(arr)
-    indexes = out_criteria(arr,inten)
+    indexes = out_criteria(arr, intensity)
     for index in indexes:
         arr_out.linked_array[index-1] = sorted([arr.linked_array[index-1,0],arr.linked_array[index,1]])
     return arr_out.sync_delete(indexes)
 
-
-'''process main function'''
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
