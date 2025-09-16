@@ -58,7 +58,7 @@ class WorkerSignals(QObject):
             features_raw, attrs_raw = File(Const.RAW).read(Const.DATASET_RAW)
             features_aln, attrs_aln = File(Const.ALN).read(Const.DATASET_ALN)
 
-            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV,limit=1000)
+            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV)
 
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -854,13 +854,48 @@ class GraphPage(QWidget):
             print(e)
             # self.plot_space.addItem(pg.InfiniteLine(pos=x,angle=90,pen=pen,movable=False))
 
+    def add_dot(self,data,y_level,color = 'w',canvas_name = None,symbol = 'o'):
+
+        if canvas_name is None:
+            plot_id = 0
+        else:
+            plot_id = self.canvas_adj[canvas_name]
+
+        x = data.ravel()
+        y = np.full_like(x, y_level)
+
+        if color == 'mult':
+            length = x.size
+
+            indices = [np.arange(i, length, len(self.palette_colors)) for i in range(len(self.palette_colors))]
+
+            x_s = [np.take(x, idx) for idx in indices]
+            y_s = [np.take(y, idy) for idy in indices]
+
+            colors = [self.palette_colors[i % len(self.palette_colors)] for i in range(length)]
+            
+            print(len(self.palette_colors))
+            for figure_index in range(len(self.palette_colors)):
+                print('!!!!!!!!!!!',figure_index)
+                print(x_s[figure_index],y_s[figure_index])
+                self.plot_spaces[plot_id].plot(x=x_s[figure_index], y=y_s[figure_index], symbol=symbol,symbol_size=10,symbolBrush=self.palette_colors[figure_index])
+                # self.plot_spaces[plot_id].plot(x,y,pen=pens)
+
+        else:
+
+            self.plot_spaces[plot_id].plot(x=x, y=y,symbol=symbol,symbol_size=10,symbolBrush=color)
+
+        self.plot_spaces[plot_id].getAxis('bottom').setVisible(True)
+
     def add_plot_mul(self, ds):
         # print(ds)
         for data in ds:
             if data[-2] == 'p':
                 self.add_plot(data[0], data[1], data[2], data[-1])
             elif data[-2] == 'vln':
-                self.add_line(data[0], data[1], data[3], data[-1])
+
+                self.add_dot(data[0], 0, data[3], data[-1])
+                #self.add_line(data[0], data[1], data[3], data[-1])
 
 
 class StatGraphPage(GraphPage):
@@ -895,8 +930,6 @@ class StatGraphPage(GraphPage):
             self.add_row(table_name,line)
 
     def add_plot_mul(self, ds):
-
-
 
         for n in range(len(ds)):
             data = ds[n][0]
