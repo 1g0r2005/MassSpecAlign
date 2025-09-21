@@ -1,6 +1,6 @@
 /*
 !.gitignore
-!Distance from ref/
+!Distance_from_ref/
 
 # Data folders (too heavy)
 HDF/
@@ -168,4 +168,5 @@ notes.txt
 
 /SideTasks/
 /SideTasks/test.py
-Distance from ref/hungarian.py
+Distance_from_ref/hungarian.py
+/Distance_from_ref/docs/
