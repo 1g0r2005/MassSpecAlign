@@ -1,10 +1,11 @@
+---
 name: Deploy Documentation to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
@@ -15,37 +16,36 @@ jobs:
   build-docs:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Python (without cache)
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        # Полностью отключаем кэширование
-        cache: ''
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: ""
 
-    - name: Install dependencies
-      run: |
-        echo "Installing Sphinx and dependencies..."
-        pip install sphinx sphinx-rtd-theme
+      - name: Install dependencies
+        run: |
+          echo "Installing Sphinx and dependencies..."
+          pip install sphinx sphinx-rtd-theme
 
-    - name: Build documentation
-      run: |
-        echo "Building documentation..."
-        cd docs
-        make html
-        echo "Documentation built successfully!"
+      - name: Build documentation
+        run: |
+          echo "Building documentation..."
+          cd docs
+          make html
+          echo "Documentation built successfully!"
 
-    - name: Setup Pages
-      uses: actions/configure-pages@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
 
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: docs/build/html/
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/build/html/
 
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
-      if: github.ref == 'refs/heads/main'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        if: github.ref == "refs/heads/main"main"
