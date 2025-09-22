@@ -1,0 +1,1351 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>main module &mdash; Assessment of the quality of MSI data alignment  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="data classes module" href="data_classes.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Assessment of the quality of MSI data alignment
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Documentation sections:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">src</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="alignment.html">alignment module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_classes.html">data classes module</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">main module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.Const"><code class="docutils literal notranslate"><span class="pre">Const</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.Const.DATASET_RAW"><code class="docutils literal notranslate"><span class="pre">Const.DATASET_RAW</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.Const.DATASET_ALN"><code class="docutils literal notranslate"><span class="pre">Const.DATASET_ALN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.Const.REF"><code class="docutils literal notranslate"><span class="pre">Const.REF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.Const.DEV"><code class="docutils literal notranslate"><span class="pre">Const.DEV</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.Const.N_DOTS"><code class="docutils literal notranslate"><span class="pre">Const.N_DOTS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.Const.BW"><code class="docutils literal notranslate"><span class="pre">Const.BW</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.Dataset"><code class="docutils literal notranslate"><span class="pre">Dataset</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.Dataset.reference"><code class="docutils literal notranslate"><span class="pre">Dataset.reference</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.DatasetHeaders"><code class="docutils literal notranslate"><span class="pre">DatasetHeaders</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.DatasetHeaders.index"><code class="docutils literal notranslate"><span class="pre">DatasetHeaders.index</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.DatasetHeaders.name"><code class="docutils literal notranslate"><span class="pre">DatasetHeaders.name</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.File"><code class="docutils literal notranslate"><span class="pre">File</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.File.real_path"><code class="docutils literal notranslate"><span class="pre">File.real_path</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.File.exist"><code class="docutils literal notranslate"><span class="pre">File.exist()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.File.read"><code class="docutils literal notranslate"><span class="pre">File.read()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.GraphPage"><code class="docutils literal notranslate"><span class="pre">GraphPage</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.GraphPage.add_dot"><code class="docutils literal notranslate"><span class="pre">GraphPage.add_dot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.GraphPage.add_line"><code class="docutils literal notranslate"><span class="pre">GraphPage.add_line()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.GraphPage.add_plot"><code class="docutils literal notranslate"><span class="pre">GraphPage.add_plot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.GraphPage.add_plot_mul"><code class="docutils literal notranslate"><span class="pre">GraphPage.add_plot_mul()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.GraphPage.pyqt_settings"><code class="docutils literal notranslate"><span class="pre">GraphPage.pyqt_settings()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.LogWidget"><code class="docutils literal notranslate"><span class="pre">LogWidget</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.LogWidget.updateText"><code class="docutils literal notranslate"><span class="pre">LogWidget.updateText()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainPage"><code class="docutils literal notranslate"><span class="pre">MainPage</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.MainPage.Pbar_forwarder"><code class="docutils literal notranslate"><span class="pre">MainPage.Pbar_forwarder()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.MainPage.Pbar_set_ranges"><code class="docutils literal notranslate"><span class="pre">MainPage.Pbar_set_ranges()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.MainPage.open_config"><code class="docutils literal notranslate"><span class="pre">MainPage.open_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.MainPage.open_file"><code class="docutils literal notranslate"><span class="pre">MainPage.open_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.MainPage.signal"><code class="docutils literal notranslate"><span class="pre">MainPage.signal()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainWindow"><code class="docutils literal notranslate"><span class="pre">MainWindow</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.MainWindow.adjust_tab_sizes"><code class="docutils literal notranslate"><span class="pre">MainWindow.adjust_tab_sizes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.MainWindow.redirect_outputs"><code class="docutils literal notranslate"><span class="pre">MainWindow.redirect_outputs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.MainWindow.resizeEvent"><code class="docutils literal notranslate"><span class="pre">MainWindow.resizeEvent()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.MainWindow.start_calc"><code class="docutils literal notranslate"><span class="pre">MainWindow.start_calc()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.ProcessManager"><code class="docutils literal notranslate"><span class="pre">ProcessManager</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.ProcessManager.process_set"><code class="docutils literal notranslate"><span class="pre">ProcessManager.process_set</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.ProcessManager.check_queues"><code class="docutils literal notranslate"><span class="pre">ProcessManager.check_queues()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.ProcessManager.end_process"><code class="docutils literal notranslate"><span class="pre">ProcessManager.end_process()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.ProcessManager.run_process"><code class="docutils literal notranslate"><span class="pre">ProcessManager.run_process()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.StatGraphPage"><code class="docutils literal notranslate"><span class="pre">StatGraphPage</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.StatGraphPage.add_data"><code class="docutils literal notranslate"><span class="pre">StatGraphPage.add_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.StatGraphPage.add_plot"><code class="docutils literal notranslate"><span class="pre">StatGraphPage.add_plot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.StatGraphPage.add_plot_mul"><code class="docutils literal notranslate"><span class="pre">StatGraphPage.add_plot_mul()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.StatGraphPage.add_row"><code class="docutils literal notranslate"><span class="pre">StatGraphPage.add_row()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.StreamRedirect"><code class="docutils literal notranslate"><span class="pre">StreamRedirect</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.StreamRedirect.flush"><code class="docutils literal notranslate"><span class="pre">StreamRedirect.flush()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.StreamRedirect.write"><code class="docutils literal notranslate"><span class="pre">StreamRedirect.write()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.TablePage"><code class="docutils literal notranslate"><span class="pre">TablePage</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.TablePage.add_data"><code class="docutils literal notranslate"><span class="pre">TablePage.add_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.TablePage.add_row"><code class="docutils literal notranslate"><span class="pre">TablePage.add_row()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.TablePage.average_selected"><code class="docutils literal notranslate"><span class="pre">TablePage.average_selected()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.TablePage.set_title"><code class="docutils literal notranslate"><span class="pre">TablePage.set_title()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.TreeWidget"><code class="docutils literal notranslate"><span class="pre">TreeWidget</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.TreeWidget.get_path"><code class="docutils literal notranslate"><span class="pre">TreeWidget.get_path()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.TreeWidget.populate_tree"><code class="docutils literal notranslate"><span class="pre">TreeWidget.populate_tree()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.TreeWidget.update_tree"><code class="docutils literal notranslate"><span class="pre">TreeWidget.update_tree()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.WorkerSignals"><code class="docutils literal notranslate"><span class="pre">WorkerSignals</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main.WorkerSignals.find_dots_process"><code class="docutils literal notranslate"><span class="pre">WorkerSignals.find_dots_process()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#main.concover"><code class="docutils literal notranslate"><span class="pre">concover()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.criteria_apply"><code class="docutils literal notranslate"><span class="pre">criteria_apply()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.find_ref"><code class="docutils literal notranslate"><span class="pre">find_ref()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.get_long_and_short"><code class="docutils literal notranslate"><span class="pre">get_long_and_short()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.get_opt_strip"><code class="docutils literal notranslate"><span class="pre">get_opt_strip()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.moving_average"><code class="docutils literal notranslate"><span class="pre">moving_average()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.out_criteria"><code class="docutils literal notranslate"><span class="pre">out_criteria()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.peak_picking"><code class="docutils literal notranslate"><span class="pre">peak_picking()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.prepare_array"><code class="docutils literal notranslate"><span class="pre">prepare_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.read_dataset"><code class="docutils literal notranslate"><span class="pre">read_dataset()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.sort_dots"><code class="docutils literal notranslate"><span class="pre">sort_dots()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.stat_params_paired_single"><code class="docutils literal notranslate"><span class="pre">stat_params_paired_single()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.stat_params_unpaired"><code class="docutils literal notranslate"><span class="pre">stat_params_unpaired()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.verify_datasets"><code class="docutils literal notranslate"><span class="pre">verify_datasets()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="data_classes.html">data classes module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">main module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#main.Const"><code class="docutils literal notranslate"><span class="pre">Const</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.Const.DATASET_RAW"><code class="docutils literal notranslate"><span class="pre">Const.DATASET_RAW</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.Const.DATASET_ALN"><code class="docutils literal notranslate"><span class="pre">Const.DATASET_ALN</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.Const.REF"><code class="docutils literal notranslate"><span class="pre">Const.REF</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.Const.DEV"><code class="docutils literal notranslate"><span class="pre">Const.DEV</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.Const.N_DOTS"><code class="docutils literal notranslate"><span class="pre">Const.N_DOTS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.Const.BW"><code class="docutils literal notranslate"><span class="pre">Const.BW</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.Dataset"><code class="docutils literal notranslate"><span class="pre">Dataset</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.Dataset.reference"><code class="docutils literal notranslate"><span class="pre">Dataset.reference</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.DatasetHeaders"><code class="docutils literal notranslate"><span class="pre">DatasetHeaders</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.DatasetHeaders.index"><code class="docutils literal notranslate"><span class="pre">DatasetHeaders.index</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.DatasetHeaders.name"><code class="docutils literal notranslate"><span class="pre">DatasetHeaders.name</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.File"><code class="docutils literal notranslate"><span class="pre">File</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.File.real_path"><code class="docutils literal notranslate"><span class="pre">File.real_path</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.File.exist"><code class="docutils literal notranslate"><span class="pre">File.exist()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.File.read"><code class="docutils literal notranslate"><span class="pre">File.read()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.GraphPage"><code class="docutils literal notranslate"><span class="pre">GraphPage</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.GraphPage.add_dot"><code class="docutils literal notranslate"><span class="pre">GraphPage.add_dot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.GraphPage.add_line"><code class="docutils literal notranslate"><span class="pre">GraphPage.add_line()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.GraphPage.add_plot"><code class="docutils literal notranslate"><span class="pre">GraphPage.add_plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.GraphPage.add_plot_mul"><code class="docutils literal notranslate"><span class="pre">GraphPage.add_plot_mul()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.GraphPage.pyqt_settings"><code class="docutils literal notranslate"><span class="pre">GraphPage.pyqt_settings()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.LogWidget"><code class="docutils literal notranslate"><span class="pre">LogWidget</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.LogWidget.updateText"><code class="docutils literal notranslate"><span class="pre">LogWidget.updateText()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.MainPage"><code class="docutils literal notranslate"><span class="pre">MainPage</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainPage.Pbar_forwarder"><code class="docutils literal notranslate"><span class="pre">MainPage.Pbar_forwarder()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainPage.Pbar_set_ranges"><code class="docutils literal notranslate"><span class="pre">MainPage.Pbar_set_ranges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainPage.open_config"><code class="docutils literal notranslate"><span class="pre">MainPage.open_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainPage.open_file"><code class="docutils literal notranslate"><span class="pre">MainPage.open_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainPage.signal"><code class="docutils literal notranslate"><span class="pre">MainPage.signal()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.MainWindow"><code class="docutils literal notranslate"><span class="pre">MainWindow</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainWindow.adjust_tab_sizes"><code class="docutils literal notranslate"><span class="pre">MainWindow.adjust_tab_sizes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainWindow.redirect_outputs"><code class="docutils literal notranslate"><span class="pre">MainWindow.redirect_outputs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainWindow.resizeEvent"><code class="docutils literal notranslate"><span class="pre">MainWindow.resizeEvent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainWindow.start_calc"><code class="docutils literal notranslate"><span class="pre">MainWindow.start_calc()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.ProcessManager"><code class="docutils literal notranslate"><span class="pre">ProcessManager</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.ProcessManager.process_set"><code class="docutils literal notranslate"><span class="pre">ProcessManager.process_set</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.ProcessManager.check_queues"><code class="docutils literal notranslate"><span class="pre">ProcessManager.check_queues()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.ProcessManager.end_process"><code class="docutils literal notranslate"><span class="pre">ProcessManager.end_process()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.ProcessManager.run_process"><code class="docutils literal notranslate"><span class="pre">ProcessManager.run_process()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.StatGraphPage"><code class="docutils literal notranslate"><span class="pre">StatGraphPage</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.StatGraphPage.add_data"><code class="docutils literal notranslate"><span class="pre">StatGraphPage.add_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.StatGraphPage.add_plot"><code class="docutils literal notranslate"><span class="pre">StatGraphPage.add_plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.StatGraphPage.add_plot_mul"><code class="docutils literal notranslate"><span class="pre">StatGraphPage.add_plot_mul()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.StatGraphPage.add_row"><code class="docutils literal notranslate"><span class="pre">StatGraphPage.add_row()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.StreamRedirect"><code class="docutils literal notranslate"><span class="pre">StreamRedirect</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.StreamRedirect.flush"><code class="docutils literal notranslate"><span class="pre">StreamRedirect.flush()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.StreamRedirect.write"><code class="docutils literal notranslate"><span class="pre">StreamRedirect.write()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.TablePage"><code class="docutils literal notranslate"><span class="pre">TablePage</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.TablePage.add_data"><code class="docutils literal notranslate"><span class="pre">TablePage.add_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.TablePage.add_row"><code class="docutils literal notranslate"><span class="pre">TablePage.add_row()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.TablePage.average_selected"><code class="docutils literal notranslate"><span class="pre">TablePage.average_selected()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.TablePage.set_title"><code class="docutils literal notranslate"><span class="pre">TablePage.set_title()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.TreeWidget"><code class="docutils literal notranslate"><span class="pre">TreeWidget</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.TreeWidget.get_path"><code class="docutils literal notranslate"><span class="pre">TreeWidget.get_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.TreeWidget.populate_tree"><code class="docutils literal notranslate"><span class="pre">TreeWidget.populate_tree()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.TreeWidget.update_tree"><code class="docutils literal notranslate"><span class="pre">TreeWidget.update_tree()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.WorkerSignals"><code class="docutils literal notranslate"><span class="pre">WorkerSignals</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main.WorkerSignals.find_dots_process"><code class="docutils literal notranslate"><span class="pre">WorkerSignals.find_dots_process()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#main.concover"><code class="docutils literal notranslate"><span class="pre">concover()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.criteria_apply"><code class="docutils literal notranslate"><span class="pre">criteria_apply()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.find_ref"><code class="docutils literal notranslate"><span class="pre">find_ref()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.get_long_and_short"><code class="docutils literal notranslate"><span class="pre">get_long_and_short()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.get_opt_strip"><code class="docutils literal notranslate"><span class="pre">get_opt_strip()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.moving_average"><code class="docutils literal notranslate"><span class="pre">moving_average()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.out_criteria"><code class="docutils literal notranslate"><span class="pre">out_criteria()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.peak_picking"><code class="docutils literal notranslate"><span class="pre">peak_picking()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.prepare_array"><code class="docutils literal notranslate"><span class="pre">prepare_array()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.read_dataset"><code class="docutils literal notranslate"><span class="pre">read_dataset()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.sort_dots"><code class="docutils literal notranslate"><span class="pre">sort_dots()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.stat_params_paired_single"><code class="docutils literal notranslate"><span class="pre">stat_params_paired_single()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.stat_params_unpaired"><code class="docutils literal notranslate"><span class="pre">stat_params_unpaired()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.verify_datasets"><code class="docutils literal notranslate"><span class="pre">verify_datasets()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="alignment.html">alignment module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Assessment of the quality of MSI data alignment</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">src</a></li>
+      <li class="breadcrumb-item active">main module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/main.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-main">
+<span id="main-module"></span><h1>main module<a class="headerlink" href="#module-main" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="main.Const">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">Const</span></span><a class="reference internal" href="_modules/main.html#Const"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.Const" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Container for application-wide constants.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.Const.DATASET_RAW">
+<span class="sig-name descname"><span class="pre">DATASET_RAW</span></span><a class="headerlink" href="#main.Const.DATASET_RAW" title="Link to this definition"></a></dt>
+<dd><p>HDF5 path to the raw spectra dataset.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.Const.DATASET_ALN">
+<span class="sig-name descname"><span class="pre">DATASET_ALN</span></span><a class="headerlink" href="#main.Const.DATASET_ALN" title="Link to this definition"></a></dt>
+<dd><p>HDF5 path to the aligned spectra dataset.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.Const.REF">
+<span class="sig-name descname"><span class="pre">REF</span></span><a class="headerlink" href="#main.Const.REF" title="Link to this definition"></a></dt>
+<dd><p>Reference m/z value used to locate the reference peak.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.Const.DEV">
+<span class="sig-name descname"><span class="pre">DEV</span></span><a class="headerlink" href="#main.Const.DEV" title="Link to this definition"></a></dt>
+<dd><p>Acceptable deviation (±) around <cite>REF</cite> when searching for the reference peak.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.Const.N_DOTS">
+<span class="sig-name descname"><span class="pre">N_DOTS</span></span><a class="headerlink" href="#main.Const.N_DOTS" title="Link to this definition"></a></dt>
+<dd><p>Number of points for KDE evaluation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.Const.BW">
+<span class="sig-name descname"><span class="pre">BW</span></span><a class="headerlink" href="#main.Const.BW" title="Link to this definition"></a></dt>
+<dd><p>Bandwidth parameter for KDE.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.Dataset">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">Dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linked_array</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#Dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.Dataset" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="data_classes.html#data_classes.LinkedList" title="data_classes.LinkedList"><code class="xref py py-class docutils literal notranslate"><span class="pre">LinkedList</span></code></a></p>
+<p>LinkedList with an optional reference value attached.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input_array</strong> (<em>array_like</em>) – Primary data.</p></li>
+<li><p><strong>linked_array</strong> (<em>array_like</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Secondary linked data.</p></li>
+<li><p><strong>reference</strong> (<em>float</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Reference m/z value associated with the dataset.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.Dataset.reference">
+<span class="sig-name descname"><span class="pre">reference</span></span><a class="headerlink" href="#main.Dataset.reference" title="Link to this definition"></a></dt>
+<dd><p>The attached reference value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.DatasetHeaders">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">DatasetHeaders</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">attrs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#DatasetHeaders"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.DatasetHeaders" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Helper to access HDF5 dataset attributes by name or index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>attrs</strong> (<em>Sequence</em><em>[</em><em>str</em><em>]</em>) – List of attribute names as provided by the HDF5 dataset.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.DatasetHeaders.index">
+<span class="sig-name descname"><span class="pre">index</span></span><a class="headerlink" href="#main.DatasetHeaders.index" title="Link to this definition"></a></dt>
+<dd><p>Mapping from attribute name to its integer index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.DatasetHeaders.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#main.DatasetHeaders.name" title="Link to this definition"></a></dt>
+<dd><p>List of attribute names in positional order.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.File">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">File</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#File"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.File" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Thin wrapper around an HDF5 file to read datasets and their headers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>file_name</strong> (<em>str</em><em> or </em><em>Path</em>) – Path to the HDF5 file.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.File.real_path">
+<span class="sig-name descname"><span class="pre">real_path</span></span><a class="headerlink" href="#main.File.real_path" title="Link to this definition"></a></dt>
+<dd><p>Resolved path to the file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Path</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.File.exist">
+<span class="sig-name descname"><span class="pre">exist</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#File.exist"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.File.exist" title="Link to this definition"></a></dt>
+<dd><p>Check whether the file exists.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if the file exists.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.File.read">
+<span class="sig-name descname"><span class="pre">read</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#File.read"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.File.read" title="Link to this definition"></a></dt>
+<dd><p>Read a dataset and its column headers from the HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>str</em>) – HDF5 path to the dataset to read.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(data,</span> <span class="pre">attr)</span></code> where <code class="docutils literal notranslate"><span class="pre">data</span></code> is a NumPy array and
+<code class="docutils literal notranslate"><span class="pre">attr</span></code> is a list/array of column headers. Returns None on error.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>Exception</strong> – If the number of headers does not match the number of columns.</p></li>
+<li><p><strong>FileNotFoundError</strong> – If the file does not exist.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.GraphPage">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">GraphPage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canvas_count</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'PlotPage'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title_plots</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(255,</span> <span class="pre">255,</span> <span class="pre">255)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bg_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_colors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autoSize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#GraphPage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.GraphPage" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">QWidget</span></code></p>
+<p>Page with one or more plotting canvases built on pyqtgraph.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parent</strong> (<em>QWidget</em>) – Parent widget.</p></li>
+<li><p><strong>canvas_count</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of plot canvases.</p></li>
+<li><p><strong>title</strong> (<em>str</em><em>, </em><em>optional</em>) – Page title.</p></li>
+<li><p><strong>title_plots</strong> (<em>Sequence</em><em>[</em><em>str</em><em>] or </em><em>None</em><em>, </em><em>optional</em>) – Titles for each canvas.</p></li>
+<li><p><strong>x_labels</strong> (<em>Sequence</em><em>[</em><em>str</em><em>] or </em><em>None</em><em>, </em><em>optional</em>) – Axis labels for each canvas.</p></li>
+<li><p><strong>y_labels</strong> (<em>Sequence</em><em>[</em><em>str</em><em>] or </em><em>None</em><em>, </em><em>optional</em>) – Axis labels for each canvas.</p></li>
+<li><p><strong>color</strong> (<em>tuple</em><em>, </em><em>optional</em>) – Default foreground color.</p></li>
+<li><p><strong>bg_color</strong> (<em>tuple</em><em>, </em><em>optional</em>) – Background color.</p></li>
+<li><p><strong>n_colors</strong> (<em>int</em><em>, </em><em>optional</em>) – Size of the categorical color palette.</p></li>
+<li><p><strong>autoSize</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to enable auto-ranging on the Y axis.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="main.GraphPage.add_dot">
+<span class="sig-name descname"><span class="pre">add_dot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'w'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canvas_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symbol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'o'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#GraphPage.add_dot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.GraphPage.add_dot" title="Link to this definition"></a></dt>
+<dd><p>Scatter plot of points at a fixed Y level.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>array_like</em>) – X positions for the markers.</p></li>
+<li><p><strong>y_level</strong> (<em>float</em>) – Y coordinate for all markers.</p></li>
+<li><p><strong>color</strong> (<em>str</em><em> or </em><em>tuple</em><em>, </em><em>optional</em>) – Color or ‘mult’ to use a palette.</p></li>
+<li><p><strong>canvas_name</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Canvas identifier; when None, use the first canvas.</p></li>
+<li><p><strong>symbol</strong> (<em>str</em><em>, </em><em>optional</em>) – Marker symbol.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.GraphPage.add_line">
+<span class="sig-name descname"><span class="pre">add_line</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_max</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'w'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canvas_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#GraphPage.add_line"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.GraphPage.add_line" title="Link to this definition"></a></dt>
+<dd><p>Draw vertical reference lines at X positions up to <cite>y_max</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>array_like</em>) – X positions of lines.</p></li>
+<li><p><strong>y_max</strong> (<em>float</em>) – Maximum Y extent for the lines.</p></li>
+<li><p><strong>color</strong> (<em>str</em><em> or </em><em>tuple</em><em>, </em><em>optional</em>) – Pen color or ‘mult’ to use a color palette.</p></li>
+<li><p><strong>canvas_name</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Canvas identifier; when None, use the first canvas.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.GraphPage.add_plot">
+<span class="sig-name descname"><span class="pre">add_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'w'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canvas_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#GraphPage.add_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.GraphPage.add_plot" title="Link to this definition"></a></dt>
+<dd><p>Plot a 2D curve on the specified canvas.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>tuple</em><em>(</em><em>ndarray</em><em>, </em><em>ndarray</em><em>)</em>) – X and Y arrays.</p></li>
+<li><p><strong>plot_name</strong> (<em>str</em>) – Name for the legend.</p></li>
+<li><p><strong>color</strong> (<em>str</em><em> or </em><em>tuple</em><em>, </em><em>optional</em>) – Pen color.</p></li>
+<li><p><strong>canvas_name</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Canvas identifier; when None, use the first canvas.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.GraphPage.add_plot_mul">
+<span class="sig-name descname"><span class="pre">add_plot_mul</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ds</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#GraphPage.add_plot_mul"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.GraphPage.add_plot_mul" title="Link to this definition"></a></dt>
+<dd><p>Render multiple plot primitives given a compact descriptor list.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ds</strong> (<em>Iterable</em><em>[</em><em>tuple</em><em>]</em>) – Each entry encodes a plot instruction; see producer for details.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.GraphPage.pyqt_settings">
+<span class="sig-name descname"><span class="pre">pyqt_settings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">plot_widget</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#GraphPage.pyqt_settings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.GraphPage.pyqt_settings" title="Link to this definition"></a></dt>
+<dd><p>Apply common pyqtgraph settings to a plot widget.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>plot_widget</strong> (<em>pg.PlotWidget</em>) – Target plot widget.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.LogWidget">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">LogWidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#LogWidget"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.LogWidget" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">QTextEdit</span></code></p>
+<p>Read-only widget to display log and info messages.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="main.LogWidget.updateText">
+<span class="sig-name descname"><span class="pre">updateText</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#LogWidget.updateText"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.LogWidget.updateText" title="Link to this definition"></a></dt>
+<dd><p>Append a message and scroll to the end.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>msg</strong> (<em>str</em>) – Message to append.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.MainPage">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">MainPage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainPage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainPage" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">QWidget</span></code></p>
+<p>Main configuration page for selecting files, datasets and parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parent</strong> (<em>QWidget</em>) – Parent main window.</p></li>
+<li><p><strong>title</strong> (<em>str</em>) – Page title.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="main.MainPage.Pbar_forwarder">
+<span class="sig-name descname"><span class="pre">Pbar_forwarder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainPage.Pbar_forwarder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainPage.Pbar_forwarder" title="Link to this definition"></a></dt>
+<dd><p>Update progress bar value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>n</strong> (<em>int</em>) – New progress value.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.MainPage.Pbar_set_ranges">
+<span class="sig-name descname"><span class="pre">Pbar_set_ranges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ranges</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainPage.Pbar_set_ranges"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainPage.Pbar_set_ranges" title="Link to this definition"></a></dt>
+<dd><p>Initialize the progress bar range and reset its value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ranges</strong> (<em>tuple</em><em>[</em><em>int</em><em>, </em><em>int</em><em>]</em>) – Minimum and maximum for the progress bar.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.MainPage.open_config">
+<span class="sig-name descname"><span class="pre">open_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainPage.open_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainPage.open_config" title="Link to this definition"></a></dt>
+<dd><p>Load configuration from a YAML file and populate the UI fields.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.MainPage.open_file">
+<span class="sig-name descname"><span class="pre">open_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainPage.open_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainPage.open_file" title="Link to this definition"></a></dt>
+<dd><p>Open a file dialog and set the selected path to the provided line edit.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>raw_filename</strong> (<em>QLineEdit</em>) – Line edit to receive the selected file path.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.MainPage.signal">
+<span class="sig-name descname"><span class="pre">signal</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainPage.signal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainPage.signal" title="Link to this definition"></a></dt>
+<dd><p>Validate inputs, persist the last configuration, and start processing.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.MainWindow">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">MainWindow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainWindow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainWindow" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">QMainWindow</span></code></p>
+<p>Main application window that hosts pages and coordinates background work.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="main.MainWindow.adjust_tab_sizes">
+<span class="sig-name descname"><span class="pre">adjust_tab_sizes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainWindow.adjust_tab_sizes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainWindow.adjust_tab_sizes" title="Link to this definition"></a></dt>
+<dd><p>Resize tab widgets to fit the current tab area.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.MainWindow.redirect_outputs">
+<span class="sig-name descname"><span class="pre">redirect_outputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ret</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainWindow.redirect_outputs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainWindow.redirect_outputs" title="Link to this definition"></a></dt>
+<dd><p>Dispatch a composite results payload to the respective UI pages.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ret</strong> (<em>Sequence</em><em>[</em><em>tuple</em><em>]</em>) – Iterable of (key, payload) pairs where key selects a handler.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.MainWindow.resizeEvent">
+<span class="sig-name descname"><span class="pre">resizeEvent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainWindow.resizeEvent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainWindow.resizeEvent" title="Link to this definition"></a></dt>
+<dd><p>Handle window resize events and adjust child sizes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>event</strong> (<em>QResizeEvent</em>) – The resize event.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.MainWindow.start_calc">
+<span class="sig-name descname"><span class="pre">start_calc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">process_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainWindow.start_calc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainWindow.start_calc" title="Link to this definition"></a></dt>
+<dd><p>Start a background calculation using the process manager.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>target</strong> (<em>callable</em>) – Function to run in background.</p></li>
+<li><p><strong>process_name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name for the process; defaults to <code class="docutils literal notranslate"><span class="pre">target.__name__</span></code>.</p></li>
+<li><p><strong>args</strong> (<em>list</em><em>, </em><em>optional</em>) – Positional arguments for the target.</p></li>
+<li><p><strong>kwargs</strong> (<em>dict</em><em>, </em><em>optional</em>) – Keyword arguments for the target.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.ProcessManager">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">ProcessManager</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">signals</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#ProcessManager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.ProcessManager" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Manage background processes and multiplex their stdout, stderr and results.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>signals</strong> (<a class="reference internal" href="#main.WorkerSignals" title="main.WorkerSignals"><em>WorkerSignals</em></a>) – Signals object to emit collected outputs to the main thread.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">output_q,</span> <span class="pre">error_q,</span> <span class="pre">return_q</span></span></dt>
+<dd><p>Internal queues used to collect outputs from child processes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>multiprocessing.Queue</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="main.ProcessManager.process_set">
+<span class="sig-name descname"><span class="pre">process_set</span></span><a class="headerlink" href="#main.ProcessManager.process_set" title="Link to this definition"></a></dt>
+<dd><p>Names of currently running processes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>set[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.ProcessManager.check_queues">
+<span class="sig-name descname"><span class="pre">check_queues</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#ProcessManager.check_queues"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.ProcessManager.check_queues" title="Link to this definition"></a></dt>
+<dd><p>Poll all internal queues and forward their content via signals.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.ProcessManager.end_process">
+<span class="sig-name descname"><span class="pre">end_process</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">process</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#ProcessManager.end_process"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.ProcessManager.end_process" title="Link to this definition"></a></dt>
+<dd><p>Join the process if tracked by name and report join errors to <cite>error_q</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>process</strong> (<em>multiprocessing.Process</em>) – Process to join.</p></li>
+<li><p><strong>target_name</strong> (<em>str</em>) – Name that identifies the process in <cite>process_set</cite>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.ProcessManager.run_process">
+<span class="sig-name descname"><span class="pre">run_process</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#ProcessManager.run_process"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.ProcessManager.run_process" title="Link to this definition"></a></dt>
+<dd><p>Start a target function in a separate process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>target</strong> (<em>callable</em>) – Function to execute in a child process.</p></li>
+<li><p><strong>target_name</strong> (<em>str</em>) – Name used to track the process.</p></li>
+<li><p><strong>args</strong> (<em>list</em><em>, </em><em>optional</em>) – Positional arguments for <cite>target</cite>.</p></li>
+<li><p><strong>kwargs</strong> (<em>dict</em><em>, </em><em>optional</em>) – Keyword arguments for <cite>target</cite>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The started process instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>multiprocessing.Process</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.StatGraphPage">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">StatGraphPage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'StatPage'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(255,</span> <span class="pre">255,</span> <span class="pre">255)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bg_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_val</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#StatGraphPage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.StatGraphPage" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#main.GraphPage" title="main.GraphPage"><code class="xref py py-class docutils literal notranslate"><span class="pre">GraphPage</span></code></a></p>
+<p>Page for visualizing summary statistics distributions across datasets.</p>
+<p>Plots include standard deviation, dip test statistic/p-value, skewness,
+and kurtosis histograms for raw and aligned data.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="main.StatGraphPage.add_data">
+<span class="sig-name descname"><span class="pre">add_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#StatGraphPage.add_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.StatGraphPage.add_data" title="Link to this definition"></a></dt>
+<dd><p>Append multiple rows into an auxiliary table by name.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.StatGraphPage.add_plot">
+<span class="sig-name descname"><span class="pre">add_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canvas_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#StatGraphPage.add_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.StatGraphPage.add_plot" title="Link to this definition"></a></dt>
+<dd><p>Plot a histogram-like step curve of the provided data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>array_like</em>) – Data to histogram.</p></li>
+<li><p><strong>plot_name</strong> (<em>str</em>) – Name for the legend.</p></li>
+<li><p><strong>color</strong> (<em>str</em><em> or </em><em>tuple</em>) – Pen color.</p></li>
+<li><p><strong>canvas_name</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Canvas identifier.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.StatGraphPage.add_plot_mul">
+<span class="sig-name descname"><span class="pre">add_plot_mul</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ds</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#StatGraphPage.add_plot_mul"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.StatGraphPage.add_plot_mul" title="Link to this definition"></a></dt>
+<dd><p>Plot multiple histogram-based statistics for provided datasets.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ds</strong> (<em>Sequence</em>) – Sequence of <code class="docutils literal notranslate"><span class="pre">((data_arrays),</span> <span class="pre">label)</span></code> pairs.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.StatGraphPage.add_row">
+<span class="sig-name descname"><span class="pre">add_row</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#StatGraphPage.add_row"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.StatGraphPage.add_row" title="Link to this definition"></a></dt>
+<dd><p>Append a row into an auxiliary table by name.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.StreamRedirect">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">StreamRedirect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#StreamRedirect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.StreamRedirect" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Redirect-like object writing messages into a multiprocessing queue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>q</strong> (<em>multiprocessing.Queue</em>) – Target queue where messages will be put.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="main.StreamRedirect.flush">
+<span class="sig-name descname"><span class="pre">flush</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#StreamRedirect.flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.StreamRedirect.flush" title="Link to this definition"></a></dt>
+<dd><p>Placeholder</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.StreamRedirect.write">
+<span class="sig-name descname"><span class="pre">write</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#StreamRedirect.write"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.StreamRedirect.write" title="Link to this definition"></a></dt>
+<dd><p>Write a message to the queue if it’s not empty or whitespace only.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>msg</strong> (<em>str</em>) – Message to forward.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.TablePage">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">TablePage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'TablePage'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#TablePage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.TablePage" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">QWidget</span></code></p>
+<p>Page containing a detailed statistics table and its row-wise average.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parent</strong> (<em>QWidget</em>) – Parent widget.</p></li>
+<li><p><strong>title</strong> (<em>str</em><em>, </em><em>optional</em>) – Page title.</p></li>
+<li><p><strong>columns</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of columns in the tables.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="main.TablePage.add_data">
+<span class="sig-name descname"><span class="pre">add_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#TablePage.add_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.TablePage.add_data" title="Link to this definition"></a></dt>
+<dd><p>Append multiple rows to the main table.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>Iterable</em><em>[</em><em>Sequence</em><em>]</em>) – Rows to append.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.TablePage.add_row">
+<span class="sig-name descname"><span class="pre">add_row</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#TablePage.add_row"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.TablePage.add_row" title="Link to this definition"></a></dt>
+<dd><p>Append a single row to the main table.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>Sequence</em>) – Row values.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.TablePage.average_selected">
+<span class="sig-name descname"><span class="pre">average_selected</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#TablePage.average_selected"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.TablePage.average_selected" title="Link to this definition"></a></dt>
+<dd><p>Compute the column-wise average for selected rows and show it below.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.TablePage.set_title">
+<span class="sig-name descname"><span class="pre">set_title</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">title</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#TablePage.set_title"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.TablePage.set_title" title="Link to this definition"></a></dt>
+<dd><p>Set column headers for both the main and average tables.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>title</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>) – Column titles.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.TreeWidget">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">TreeWidget</span></span><a class="reference internal" href="_modules/main.html#TreeWidget"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.TreeWidget" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">QWidget</span></code></p>
+<p>Widget for browsing HDF5 groups and datasets as a tree.</p>
+<section id="signals">
+<h2>Signals<a class="headerlink" href="#signals" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>path_signal<span class="classifier">pyqtSignal(str)</span></dt><dd><p>Emitted with the path of the double-clicked node.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="main.TreeWidget.get_path">
+<span class="sig-name descname"><span class="pre">get_path</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#TreeWidget.get_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.TreeWidget.get_path" title="Link to this definition"></a></dt>
+<dd><p>Return the HDF5-like path of the selected node and emit it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The constructed path of the selected item.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.TreeWidget.populate_tree">
+<span class="sig-name descname"><span class="pre">populate_tree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#TreeWidget.populate_tree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.TreeWidget.populate_tree" title="Link to this definition"></a></dt>
+<dd><p>Populate the tree with the hierarchy of an HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em>) – Path to an HDF5 file on disk.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.TreeWidget.update_tree">
+<span class="sig-name descname"><span class="pre">update_tree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#TreeWidget.update_tree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.TreeWidget.update_tree" title="Link to this definition"></a></dt>
+<dd><p>Clear and rebuild the tree from an HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em>) – Path to an HDF5 file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="main.WorkerSignals">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">WorkerSignals</span></span><a class="reference internal" href="_modules/main.html#WorkerSignals"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.WorkerSignals" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">QObject</span></code></p>
+<p>Signals and processing pipeline for background computations.</p>
+<section id="id1">
+<h2>Signals<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>output<span class="classifier">pyqtSignal(str)</span></dt><dd><p>Emitted for redirected standard output messages.</p>
+</dd>
+<dt>error<span class="classifier">pyqtSignal(str)</span></dt><dd><p>Emitted for redirected standard error messages or exceptions.</p>
+</dd>
+<dt>result<span class="classifier">pyqtSignal(object)</span></dt><dd><p>Emitted with computation results to be consumed by the main thread.</p>
+</dd>
+<dt>finished<span class="classifier">pyqtSignal()</span></dt><dd><p>Emitted when the processing pipeline finishes.</p>
+</dd>
+<dt>progress<span class="classifier">pyqtSignal(int)</span></dt><dd><p>Emitted to update a progress bar.</p>
+</dd>
+<dt>create_pbar<span class="classifier">pyqtSignal(tuple)</span></dt><dd><p>Emitted to initialize a progress bar. Expected tuple is (min, max).</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="main.WorkerSignals.find_dots_process">
+<span class="sig-name descname"><span class="pre">find_dots_process</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#WorkerSignals.find_dots_process"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.WorkerSignals.find_dots_process" title="Link to this definition"></a></dt>
+<dd><p>Run the main data processing pipeline.</p>
+<p>The pipeline reads raw and aligned spectra from HDF5, computes KDEs,
+performs peak picking, applies criteria, aligns peak lists, and computes
+descriptive and inferential statistics. Results are emitted via the
+<cite>result</cite> signal as a tuple of render instructions and statistics.</p>
+<p class="rubric">Notes</p>
+<dl class="simple">
+<dt>Emits</dt><dd><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">create_pbar</span></code>: tuple of (min, max) for a progress bar.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">progress</span></code>: updates during dataset iteration.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">result</span></code>: composite payload for UI updates.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">finished</span></code>: upon completion or on handled exception.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">error</span></code>: formatted traceback on exception.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.concover">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">concover</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arr1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arr2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#concover"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.concover" title="Link to this definition"></a></dt>
+<dd><p>Compare two distributions using a rank-based variance (Conover-like) test.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>arr1</strong> (<em>ndarray</em>) – Samples from two distributions.</p></li>
+<li><p><strong>arr2</strong> (<em>ndarray</em>) – Samples from two distributions.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>p-value for the test of equal scale/dispersion.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.criteria_apply">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">criteria_apply</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intensity</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#criteria_apply"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.criteria_apply" title="Link to this definition"></a></dt>
+<dd><p>Merge narrow neighboring intervals and drop flagged indices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>arr</strong> (<a class="reference internal" href="data_classes.html#data_classes.LinkedList" title="data_classes.LinkedList"><em>LinkedList</em></a>) – Peak centers with linked left/right boundaries.</p></li>
+<li><p><strong>intensity</strong> (<em>ndarray</em>) – Intensities used to evaluate the criteria.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Filtered peaks with adjusted boundaries.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="data_classes.html#data_classes.LinkedList" title="data_classes.LinkedList">LinkedList</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.find_ref">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">find_ref</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#main.Dataset" title="main.Dataset"><span class="pre">Dataset</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">approx_mz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deviation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">[&lt;class</span> <span class="pre">'float'&gt;,</span> <span class="pre">&lt;class</span> <span class="pre">'float'&gt;]</span></span></span><a class="reference internal" href="_modules/main.html#find_ref"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.find_ref" title="Link to this definition"></a></dt>
+<dd><p>Locate a reference peak near an approximate m/z within a deviation window.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<a class="reference internal" href="#main.Dataset" title="main.Dataset"><em>Dataset</em></a>) – Sorted m/z values (primary) with intensities as linked data.</p></li>
+<li><p><strong>approx_mz</strong> (<em>float</em>) – Approximate m/z for the reference.</p></li>
+<li><p><strong>deviation</strong> (<em>float</em><em>, </em><em>optional</em>) – Allowed deviation around <cite>approx_mz</cite> for candidate search.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Pair <code class="docutils literal notranslate"><span class="pre">(index,</span> <span class="pre">mz)</span></code> of the selected reference peak.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.get_long_and_short">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">get_long_and_short</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arr_1:</span> <span class="pre">~numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arr_2:</span> <span class="pre">~numpy.ndarray)</span> <span class="pre">-&gt;</span> <span class="pre">(&lt;class</span> <span class="pre">'numpy.ndarray'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">&lt;class</span> <span class="pre">'numpy.ndarray'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">&lt;class</span> <span class="pre">'bool'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#get_long_and_short"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.get_long_and_short" title="Link to this definition"></a></dt>
+<dd><p>Return the longer and shorter of two arrays and a flag indicating order.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>arr_1</strong> (<em>ndarray</em>) – Arrays to compare by first-dimension length.</p></li>
+<li><p><strong>arr_2</strong> (<em>ndarray</em>) – Arrays to compare by first-dimension length.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>long</strong> (<em>ndarray</em>) – The longer array.</p></li>
+<li><p><strong>short</strong> (<em>ndarray</em>) – The shorter array.</p></li>
+<li><p><strong>flag</strong> (<em>bool</em>) – True if <code class="docutils literal notranslate"><span class="pre">arr_1</span></code> is the longer array, else False.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.get_opt_strip">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">get_opt_strip</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arr_long:</span> <span class="pre">~main.Dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arr_short:</span> <span class="pre">~main.Dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flag:</span> <span class="pre">bool)</span> <span class="pre">-&gt;</span> <span class="pre">(&lt;class</span> <span class="pre">'main.Dataset'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">&lt;class</span> <span class="pre">'main.Dataset'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#get_opt_strip"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.get_opt_strip" title="Link to this definition"></a></dt>
+<dd><p>Align two sequences by shifting the longer to minimize mean squared error.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>arr_long</strong> (<a class="reference internal" href="#main.Dataset" title="main.Dataset"><em>Dataset</em></a>) – Longer dataset.</p></li>
+<li><p><strong>arr_short</strong> (<a class="reference internal" href="#main.Dataset" title="main.Dataset"><em>Dataset</em></a>) – Shorter dataset.</p></li>
+<li><p><strong>flag</strong> (<em>bool</em>) – True if <cite>arr_long</cite> corresponds to the original first argument from
+<code class="docutils literal notranslate"><span class="pre">get_long_and_short</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Sliced/shifted versions with equal length, ordered to match the flag.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#main.Dataset" title="main.Dataset">Dataset</a>, <a class="reference internal" href="#main.Dataset" title="main.Dataset">Dataset</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.moving_average">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">moving_average</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#moving_average"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.moving_average" title="Link to this definition"></a></dt>
+<dd><p>Compute the simple moving average over a 1D array.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a</strong> (<em>ndarray</em>) – Input array.</p></li>
+<li><p><strong>n</strong> (<em>int</em><em>, </em><em>optional</em>) – Window size. Default is 2.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Averaged array of length <code class="docutils literal notranslate"><span class="pre">len(a)</span> <span class="pre">-</span> <span class="pre">n</span> <span class="pre">+</span> <span class="pre">1</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.out_criteria">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">out_criteria</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mz</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intensity</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">int_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_diff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width_eps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#out_criteria"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.out_criteria" title="Link to this definition"></a></dt>
+<dd><p>Identify outlier peak intervals based on intensity and width heuristics.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mz</strong> (<a class="reference internal" href="#main.Dataset" title="main.Dataset"><em>Dataset</em></a><em> or </em><a class="reference internal" href="data_classes.html#data_classes.LinkedList" title="data_classes.LinkedList"><em>LinkedList</em></a>) – Peak centers with linked boundaries in <cite>linked_array</cite>.</p></li>
+<li><p><strong>intensity</strong> (<em>ndarray</em>) – Intensities corresponding to <cite>mz</cite> centers.</p></li>
+<li><p><strong>int_threshold</strong> (<em>float</em><em>, </em><em>optional</em>) – Fraction of the maximum intensity below which points are flagged.</p></li>
+<li><p><strong>max_diff</strong> (<em>float</em><em>, </em><em>optional</em>) – Maximum relative change between consecutive intensities (as <a href="#id2"><span class="problematic" id="id3">|a/b - 1|</span></a>).</p></li>
+<li><p><strong>width_eps</strong> (<em>float</em><em>, </em><em>optional</em>) – Threshold on normalized width ratio used for flagging.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Indices of points considered outliers.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.peak_picking">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">peak_picking</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">oversegmentation_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">peak_location</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#peak_picking"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.peak_picking" title="Link to this definition"></a></dt>
+<dd><p>Detect peaks in a KDE curve and return their centers and boundaries.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>X</strong> (<em>ndarray</em>) – Monotonic array of X coordinates (e.g., m/z grid).</p></li>
+<li><p><strong>Y</strong> (<em>ndarray</em>) – Corresponding density/height values.</p></li>
+<li><p><strong>oversegmentation_filter</strong> (<em>float</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Minimal allowed separation between adjacent peaks; when provided, peaks
+closer than this threshold are merged.</p></li>
+<li><p><strong>peak_location</strong> (<em>float</em><em>, </em><em>optional</em>) – Fraction of the peak height to compute a barycentric center; used in
+boundary calculations as a threshold. Default is 1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>pk_x</strong> (<em>ndarray</em>) – Estimated peak centers (X positions). May contain NaNs if a region has
+no samples above the threshold.</p></li>
+<li><p><strong>left</strong> (<em>ndarray</em>) – Left boundary (valley position) for each peak.</p></li>
+<li><p><strong>right</strong> (<em>ndarray</em>) – Right boundary (valley position) for each peak.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.prepare_array">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">prepare_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">distances</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#prepare_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.prepare_array" title="Link to this definition"></a></dt>
+<dd><p>Concatenate per-peak distances and build a 2-row sorted view with indices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>distances</strong> (<em>ndarray</em><em> or </em><em>Sequence</em>) – Pair or sequence of sequences to concatenate and index.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A 2 x K array with sorted values in row 0 and original indices in row 1.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.read_dataset">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">read_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_raw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attrs_raw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_aln</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attrs_aln</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">REF</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DEV</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#read_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.read_dataset" title="Link to this definition"></a></dt>
+<dd><p>Prepare per-spectrum datasets and emit progress for the UI.</p>
+<p>This function extracts m/z and intensity columns, sorts by m/z, verifies
+alignment of raw vs. aligned spectra, finds reference peaks, and collects
+them into a pair of arrays suitable for downstream processing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> (<a class="reference internal" href="#main.WorkerSignals" title="main.WorkerSignals"><em>WorkerSignals</em></a>) – Object used to emit progress-related signals.</p></li>
+<li><p><strong>dataset_raw</strong> (<em>ndarray</em>) – Raw and aligned datasets read from HDF5.</p></li>
+<li><p><strong>dataset_aln</strong> (<em>ndarray</em>) – Raw and aligned datasets read from HDF5.</p></li>
+<li><p><strong>attrs_raw</strong> (<em>list</em>) – Column headers for the respective datasets.</p></li>
+<li><p><strong>attrs_aln</strong> (<em>list</em>) – Column headers for the respective datasets.</p></li>
+<li><p><strong>REF</strong> (<em>float</em>) – Reference m/z seed.</p></li>
+<li><p><strong>DEV</strong> (<em>float</em>) – Acceptable deviation around <cite>REF</cite>.</p></li>
+<li><p><strong>limit</strong> (<em>int</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Optional limit on the number of spectra to process (debugging).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>2 x N object array of Dataset-like sequences (raw, aligned) by spectrum index.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.sort_dots">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">sort_dots</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">left</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">right</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/main.html#sort_dots"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.sort_dots" title="Link to this definition"></a></dt>
+<dd><p>Group values into bins defined by paired left/right boundaries.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ds</strong> (<em>ndarray</em>) – Values to be grouped.</p></li>
+<li><p><strong>left</strong> (<em>ndarray</em>) – Left boundaries for each bin.</p></li>
+<li><p><strong>right</strong> (<em>ndarray</em>) – Right boundaries for each bin.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>For each interval [left[i], right[i]], the subset of <cite>ds</cite> within it.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.stat_params_paired_single">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">stat_params_paired_single</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">peak_raw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">peak_aln</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#stat_params_paired_single"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.stat_params_paired_single" title="Link to this definition"></a></dt>
+<dd><p>Compute paired statistics between raw and aligned peak positions.</p>
+<p>For each matched peak, compute mean difference, variances, normality check,
+and hypothesis tests for means and variances.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>peak_raw</strong> (<em>array_like</em>) – Samples of raw and aligned values for a single peak.</p></li>
+<li><p><strong>peak_aln</strong> (<em>array_like</em>) – Samples of raw and aligned values for a single peak.</p></li>
+<li><p><strong>p_value</strong> (<em>float</em><em>, </em><em>optional</em>) – Significance level used in tests. Default is 0.05.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">(mean_diff,</span> <span class="pre">var_raw,</span> <span class="pre">var_aln,</span> <span class="pre">is_normal,</span> <span class="pre">neq_mean,</span> <span class="pre">neq_var)</span></code>
+where boolean flags are returned as floats (0.0/1.0).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.stat_params_unpaired">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">stat_params_unpaired</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ds</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#stat_params_unpaired"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.stat_params_unpaired" title="Link to this definition"></a></dt>
+<dd><p>Compute unpaired per-group statistics for a list of arrays.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ds</strong> (<em>Sequence</em><em>[</em><em>array_like</em><em>]</em>) – Sequence of samples (e.g., peak positions per bin).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Array with columns: variance, dip statistic, dip p-value, skewness,
+kurtosis for each group.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.verify_datasets">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">verify_datasets</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_1:</span> <span class="pre">~data_classes.LinkedList</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_2:</span> <span class="pre">~data_classes.LinkedList</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold=1.0)</span> <span class="pre">-&gt;</span> <span class="pre">(&lt;class</span> <span class="pre">'data_classes.LinkedList'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">&lt;class</span> <span class="pre">'data_classes.LinkedList'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#verify_datasets"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.verify_datasets" title="Link to this definition"></a></dt>
+<dd><p>Verify and co-trim two sorted datasets so that element-wise differences are bounded.</p>
+<p>The function optionally removes one outlier (by index) and re-aligns to
+satisfy the threshold, returning two arrays of equal length.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data_1</strong> (<a class="reference internal" href="data_classes.html#data_classes.LinkedList" title="data_classes.LinkedList"><em>LinkedList</em></a>) – Input datasets to verify.</p></li>
+<li><p><strong>data_2</strong> (<a class="reference internal" href="data_classes.html#data_classes.LinkedList" title="data_classes.LinkedList"><em>LinkedList</em></a>) – Input datasets to verify.</p></li>
+<li><p><strong>threshold</strong> (<em>float</em><em> or </em><em>str</em><em>, </em><em>optional</em>) – Maximum allowed absolute difference between paired values. If
+<code class="docutils literal notranslate"><span class="pre">'dist_based'</span></code>, the mean difference is used as the threshold.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Verified (possibly trimmed) datasets of equal size.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="data_classes.html#data_classes.LinkedList" title="data_classes.LinkedList">LinkedList</a>, <a class="reference internal" href="data_classes.html#data_classes.LinkedList" title="data_classes.LinkedList">LinkedList</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="data_classes.html" class="btn btn-neutral float-left" title="data classes module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Basikhin Igor, Andrey Kuzin.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

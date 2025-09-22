@@ -1,0 +1,282 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>alignment &mdash; Assessment of the quality of MSI data alignment  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Assessment of the quality of MSI data alignment
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Documentation sections:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules.html">src</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_classes.html">data classes module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../main.html">main module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../alignment.html">alignment module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Assessment of the quality of MSI data alignment</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Module code</a></li>
+      <li class="breadcrumb-item active">alignment</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for alignment</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="kn">import</span> <span class="n">linear_sum_assignment</span>
+<span class="kn">from</span> <span class="nn">data_classes</span> <span class="kn">import</span> <span class="o">*</span>
+
+
+<div class="viewcode-block" id="munkres_align">
+<a class="viewcode-back" href="../alignment.html#alignment.munkres_align">[docs]</a>
+<span class="k">def</span> <span class="nf">munkres_align</span><span class="p">(</span><span class="n">x_arr</span><span class="p">,</span><span class="n">y_arr</span><span class="p">,</span><span class="n">x_linked</span><span class="p">,</span><span class="n">y_linked</span><span class="p">,</span><span class="n">intens_x</span><span class="p">,</span><span class="n">intens_y</span><span class="p">,</span><span class="n">skip_fraction</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span><span class="n">skip_level</span><span class="o">=</span><span class="mf">0.8</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Align two sequences using the Hungarian (Munkres) algorithm with an</span>
+<span class="sd">    intensity-aware distance cost and optional skipping.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    x_arr : Sequence[array_like] or array_like</span>
+<span class="sd">        Sequence of items for the X side. Each item is reduced to its mean</span>
+<span class="sd">        value for distance computation.</span>
+<span class="sd">    y_arr : Sequence[array_like] or array_like</span>
+<span class="sd">        Sequence of items for the Y side, treated analogously to `x_arr`.</span>
+<span class="sd">    x_linked : array_like</span>
+<span class="sd">        Array of auxiliary data associated with `x_arr` (returned aligned; e.g.,</span>
+<span class="sd">        original structures or metadata). Must be indexable by the same indices</span>
+<span class="sd">        as `x_arr`.</span>
+<span class="sd">    y_linked : array_like</span>
+<span class="sd">        Auxiliary data associated with `y_arr` (returned aligned).</span>
+<span class="sd">    intens_x : array_like</span>
+<span class="sd">        Intensity values associated with `x_arr`, used as the</span>
+<span class="sd">        `linked_array` to compute intensity differences in the cost.</span>
+<span class="sd">    intens_y : array_like</span>
+<span class="sd">        Intensity values associated with `y_arr`.</span>
+<span class="sd">    skip_fraction : float, optional</span>
+<span class="sd">        Fraction of additional dummy rows/cols to add to the cost matrix to</span>
+<span class="sd">        enable skipping matches. ``round(n * skip_fraction)`` rows/cols are</span>
+<span class="sd">        padded, where ``n`` is the current matrix size. Default is 0.3.</span>
+<span class="sd">    skip_level : float, optional</span>
+<span class="sd">        Multiplier applied to the maximum cost to set the padding value for</span>
+<span class="sd">        dummy rows/cols. Higher values discourage skipping. Default is 0.8.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    aln_x : list</span>
+<span class="sd">        Elements of `x_arr` selected by the optimal assignment, in match order.</span>
+<span class="sd">    aln_y : list</span>
+<span class="sd">        Elements of `y_arr` selected by the optimal assignment, in match order.</span>
+<span class="sd">    aln_x_linked : ndarray</span>
+<span class="sd">        Items from `x_linked` corresponding to `aln_x`.</span>
+<span class="sd">    aln_y_linked : ndarray</span>
+<span class="sd">        Items from `y_linked` corresponding to `aln_y`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">convert</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">arr</span><span class="p">,</span><span class="n">arr_linked</span><span class="p">:</span> <span class="n">LinkedList</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">el</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="k">for</span> <span class="n">el</span> <span class="ow">in</span> <span class="n">arr</span><span class="p">]),</span><span class="n">arr_linked</span><span class="p">)</span>
+    <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">x_arr</span><span class="p">,</span><span class="n">intens_x</span><span class="p">),</span> <span class="n">convert</span><span class="p">(</span><span class="n">y_arr</span><span class="p">,</span><span class="n">intens_y</span><span class="p">)</span>
+
+    <span class="n">x_len</span><span class="p">,</span><span class="n">y_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">),</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+    <span class="n">x_n</span><span class="p">,</span><span class="n">y_n</span> <span class="o">=</span> <span class="n">__equal_size</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;xn: </span><span class="si">{</span><span class="n">x_n</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;yn: </span><span class="si">{</span><span class="n">y_n</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">matrix</span> <span class="o">=</span> <span class="n">__make_matrix</span><span class="p">(</span><span class="n">x_n</span><span class="p">,</span><span class="n">y_n</span><span class="p">,</span><span class="n">skip_fraction</span><span class="p">,</span><span class="n">skip_level</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;matrix shape </span><span class="si">{</span><span class="n">matrix</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">linear_sum_assignment</span><span class="p">(</span><span class="n">matrix</span><span class="p">))</span>
+    <span class="n">condition</span> <span class="o">=</span> <span class="p">(</span><span class="n">indexes</span><span class="p">[</span><span class="mi">0</span><span class="p">,:]</span> <span class="o">&lt;</span> <span class="n">x_len</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">indexes</span><span class="p">[</span><span class="mi">1</span><span class="p">,:]</span> <span class="o">&lt;</span> <span class="n">y_len</span><span class="p">)</span>
+    <span class="n">xind</span>  <span class="o">=</span> <span class="n">indexes</span><span class="p">[:,</span><span class="n">condition</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">yind</span> <span class="o">=</span> <span class="n">indexes</span><span class="p">[:,</span><span class="n">condition</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">aln_x</span> <span class="o">=</span> <span class="p">[</span><span class="n">x_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">xind</span><span class="p">]</span>
+    <span class="n">aln_y</span> <span class="o">=</span> <span class="p">[</span><span class="n">y_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">yind</span><span class="p">]</span>
+
+
+    <span class="n">aln_x_linked</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">x_linked</span><span class="p">)[</span><span class="n">xind</span><span class="p">]</span>
+    <span class="n">aln_y_linked</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y_linked</span><span class="p">)[</span><span class="n">yind</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">aln_x</span><span class="p">,</span><span class="n">aln_y</span><span class="p">,</span><span class="n">aln_x_linked</span><span class="p">,</span><span class="n">aln_y_linked</span></div>
+
+
+<span class="k">def</span> <span class="nf">__w</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span><span class="n">alpha_dist</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span><span class="n">alpha_int</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">k</span> <span class="o">=</span> <span class="mi">20</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the pairwise cost between two LinkedLists combining distance and</span>
+<span class="sd">    intensity differences with exponential scaling and tanh normalization.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    x : LinkedList or array_like</span>
+<span class="sd">        Values for the first axis. When `LinkedList`, its `linked_array` is used</span>
+<span class="sd">        to compute intensity differences.</span>
+<span class="sd">    y : LinkedList or array_like</span>
+<span class="sd">        Values for the second axis. When `LinkedList`, its `linked_array` is</span>
+<span class="sd">        used to compute intensity differences.</span>
+<span class="sd">    alpha_dist : float, optional</span>
+<span class="sd">        Exponential scaling factor for absolute distance differences. Default is</span>
+<span class="sd">        0.01.</span>
+<span class="sd">    alpha_int : float, optional</span>
+<span class="sd">        Exponential scaling factor for absolute intensity differences. Default</span>
+<span class="sd">        is 0.01.</span>
+<span class="sd">    k : float, optional</span>
+<span class="sd">        Scaling parameter for the tanh normalization. Default is 20.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    ndarray</span>
+<span class="sd">        A 2-D cost matrix broadcast from `x` and `y` shapes, with entries in</span>
+<span class="sd">        the range (-1, 1), approaching 1 for large combined differences.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">x_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">y_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+
+    <span class="n">x_linked</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">linked_array</span><span class="p">)</span>
+    <span class="n">y_linked</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">linked_array</span><span class="p">)</span>
+
+    <span class="n">scale</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">var</span><span class="p">,</span><span class="n">alpha</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">var</span><span class="o">*</span><span class="n">alpha</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span>
+    <span class="n">norm</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">var</span><span class="p">,</span><span class="n">k</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">tanh</span><span class="p">(</span><span class="n">var</span><span class="o">/</span><span class="n">k</span><span class="p">)</span>
+
+    <span class="n">dist_scaled</span> <span class="o">=</span> <span class="n">scale</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">x_arr</span><span class="o">-</span><span class="n">y_arr</span><span class="p">),</span><span class="n">alpha_dist</span><span class="p">)</span>
+    <span class="n">dint_scaled</span> <span class="o">=</span> <span class="n">scale</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">x_linked</span><span class="o">-</span><span class="n">y_linked</span><span class="p">),</span><span class="n">alpha_int</span><span class="p">)</span>
+
+    <span class="n">weight</span> <span class="o">=</span> <span class="p">(</span><span class="n">dist_scaled</span><span class="o">**</span><span class="mi">2</span><span class="o">+</span><span class="n">dint_scaled</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">**</span><span class="mf">0.5</span>
+
+    <span class="k">return</span> <span class="n">norm</span><span class="p">(</span><span class="n">weight</span><span class="p">,</span><span class="n">k</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">__make_matrix</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="n">skip_fraction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">skip_level</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Build a padded cost matrix for assignment, allowing optional skipping via</span>
+<span class="sd">    dummy rows/columns filled with a constant penalty.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    x : LinkedList</span>
+<span class="sd">        Input values (possibly reshaped to 2-D) for the first axis.</span>
+<span class="sd">    y : LinkedList</span>
+<span class="sd">        Input values (possibly reshaped to 2-D) for the second axis.</span>
+<span class="sd">    skip_fraction : float or None, optional</span>
+<span class="sd">        Fraction of the base matrix size to determine how many dummy rows/cols</span>
+<span class="sd">        to pad. If None, no padding is applied. Default is None.</span>
+<span class="sd">    skip_level : float, optional</span>
+<span class="sd">        Multiplier for the maximum base cost to set the pad penalty. Default is</span>
+<span class="sd">        1.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    ndarray</span>
+<span class="sd">        The (possibly padded) 2-D cost matrix suitable for</span>
+<span class="sd">        ``scipy.optimize.linear_sum_assignment``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">matrix</span> <span class="o">=</span>  <span class="n">__w</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">sync_reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)),</span> <span class="n">y</span><span class="o">.</span><span class="n">sync_reshape</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="n">skip_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">add_lines</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">matrix</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">skip_fraction</span><span class="p">)</span>
+        <span class="n">pad_value</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">*</span><span class="n">skip_level</span>
+        <span class="n">matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">matrix</span><span class="p">,((</span><span class="mi">0</span><span class="p">,</span><span class="n">add_lines</span><span class="p">),(</span><span class="mi">0</span><span class="p">,</span><span class="n">add_lines</span><span class="p">)),</span><span class="s1">&#39;constant&#39;</span><span class="p">,</span><span class="n">constant_values</span><span class="o">=</span><span class="n">pad_value</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">matrix</span>
+
+<span class="k">def</span> <span class="nf">__equal_size</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Make two LinkedLists equal in length by padding the shorter one with</span>
+<span class="sd">    ``np.inf`` both in values and in its linked array.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    x : LinkedList</span>
+<span class="sd">        First sequence.</span>
+<span class="sd">    y : LinkedList</span>
+<span class="sd">        Second sequence.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple of LinkedList</span>
+<span class="sd">        A pair ``(x_equal, y_equal)`` with matching lengths.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">change_linked</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">linked_arr</span><span class="p">,</span> <span class="n">delta</span><span class="p">:</span> <span class="n">LinkedList</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">linked_arr</span><span class="p">,</span><span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">delta</span><span class="p">,</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">)]),</span><span class="n">linked_array</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">linked_arr</span><span class="o">.</span><span class="n">linked_array</span><span class="p">,</span><span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">delta</span><span class="p">,</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">)]))</span>
+
+    <span class="n">x_len</span><span class="p">,</span><span class="n">y_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">),</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+    <span class="n">d_len</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">x_len</span><span class="o">-</span><span class="n">y_len</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">x_len</span> <span class="o">==</span> <span class="n">y_len</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">x</span><span class="p">,</span><span class="n">y</span>
+    <span class="k">elif</span> <span class="n">x_len</span> <span class="o">&gt;</span> <span class="n">y_len</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">change_linked</span><span class="p">(</span><span class="n">y</span><span class="p">,</span><span class="n">d_len</span><span class="p">)</span><span class="c1">#np.concatenate([y,np.full(x_len-y_len,np.inf)])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">change_linked</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">d_len</span><span class="p">),</span><span class="n">y</span><span class="c1">#np.concatenate([x, np.full(y_len - x_len, np.inf)]),y</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Basikhin Igor, Andrey Kuzin.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
