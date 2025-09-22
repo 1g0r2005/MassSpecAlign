@@ -33,8 +33,8 @@ jobs:
       - name: Build documentation
         run: |
           echo "Building documentation..."
-          cd .\Distance_from_ref\docs
-          make html
+          # Правильные пути относительно корня репозитория
+          python -m sphinx -b html ./Distance_from_ref/docs/source ./Distance_from_ref/docs/build/html
           echo "Documentation built successfully!"
 
       - name: Setup Pages
@@ -43,7 +43,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/build/html/
+          path: ./Distance_from_ref/docs/build/html/
 
       - name: Deploy to GitHub Pages
         id: deployment
