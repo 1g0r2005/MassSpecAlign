@@ -2,18 +2,14 @@ name: Deploy Documentation to GitHub Pages
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 permissions:
   contents: read
   pages: write
   id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
 
 jobs:
   build-docs:
@@ -21,23 +17,25 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
-    - name: Setup Python
+    - name: Setup Python (without cache)
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+        # Полностью отключаем кэширование
         cache: ''
 
     - name: Install dependencies
       run: |
+        echo "Installing Sphinx and dependencies..."
         pip install sphinx sphinx-rtd-theme
 
     - name: Build documentation
       run: |
+        echo "Building documentation..."
         cd docs
         make html
+        echo "Documentation built successfully!"
 
     - name: Setup Pages
       uses: actions/configure-pages@v4
@@ -50,4 +48,4 @@ jobs:
     - name: Deploy to GitHub Pages
       id: deployment
       uses: actions/deploy-pages@v4
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      if: github.ref == 'refs/heads/main'
