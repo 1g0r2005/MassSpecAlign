@@ -33,7 +33,7 @@ jobs:
       - name: Build documentation
         run: |
           echo "Building documentation..."
-          cd docs
+          cd .\Distance_from_ref\docs
           make html
           echo "Documentation built successfully!"
 
@@ -48,4 +48,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        if: github.ref == "refs/heads/main"main"
+        if: ${{ github.ref == 'refs/heads/main' }}
