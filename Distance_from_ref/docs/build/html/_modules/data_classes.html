@@ -226,6 +226,33 @@
             <span class="n">new_linked_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">linked_array</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">LinkedList</span><span class="p">(</span><span class="n">new_self</span><span class="p">,</span> <span class="n">new_linked_array</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">new_self</span></div>
+
+
+<div class="viewcode-block" id="LinkedList.sync_split">
+<a class="viewcode-back" href="../data_classes.html#data_classes.LinkedList.sync_split">[docs]</a>
+    <span class="k">def</span> <span class="nf">sync_split</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">indices_or_sections</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Split both the array and the linked array into multiple sub-arrays.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        indices_or_sections : int or 1-D array_like</span>
+<span class="sd">            If an integer, it indicates the number of equal splits to make.</span>
+<span class="sd">            If an array, it indicates the indices at which to split.</span>
+<span class="sd">        axis : int, optional</span>
+<span class="sd">            Axis along which to split. Default is 0.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list of LinkedList or ndarray</span>
+<span class="sd">            A list of `LinkedList` objects if a `linked_array` exists;</span>
+<span class="sd">            otherwise, a list of regular ndarray arrays.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">split_self</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices_or_sections</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">linked_array</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">split_linked</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">linked_array</span><span class="p">,</span> <span class="n">indices_or_sections</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">LinkedList</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span><span class="p">,</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">split_self</span><span class="p">,</span> <span class="n">split_linked</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">split_self</span></div>
 </div>
 
 </pre></div>

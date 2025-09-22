@@ -46,6 +46,7 @@
 <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="modules.html">src</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="#">alignment module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#alignment.munkres"><code class="docutils literal notranslate"><span class="pre">munkres()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#alignment.munkres_align"><code class="docutils literal notranslate"><span class="pre">munkres_align()</span></code></a></li>
 </ul>
 </li>
@@ -56,6 +57,7 @@
 <li class="toctree-l1"><a class="reference internal" href="data_classes.html">data classes module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="main.html">main module</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">alignment module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#alignment.munkres"><code class="docutils literal notranslate"><span class="pre">munkres()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#alignment.munkres_align"><code class="docutils literal notranslate"><span class="pre">munkres_align()</span></code></a></li>
 </ul>
 </li>
@@ -89,8 +91,65 @@
   <section id="module-alignment">
 <span id="alignment-module"></span><h1>alignment module<a class="headerlink" href="#module-alignment" title="Link to this heading"></a></h1>
 <dl class="py function">
+<dt class="sig sig-object py" id="alignment.munkres">
+<span class="sig-prename descclassname"><span class="pre">alignment.</span></span><span class="sig-name descname"><span class="pre">munkres</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x_arr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_arr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_linked</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_linked</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intens_x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intens_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_fraction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.9</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">segmentation_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/alignment.html#munkres"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#alignment.munkres" title="Link to this definition"></a></dt>
+<dd><p>Chunked alignment wrapper over <cite>munkres_align</cite> to handle large inputs.</p>
+<p>This function splits both input sequences and their linked/intensity arrays
+into chunks to control memory usage and runtime, aligns each chunk
+independently via the Hungarian algorithm, and concatenates the results.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x_arr</strong> (<em>Sequence</em><em>[</em><em>array_like</em><em>] or </em><em>array_like</em>) – Sequences of items for the X and Y sides. Each item is reduced to its
+mean value inside <cite>munkres_align</cite> for distance computation.</p></li>
+<li><p><strong>y_arr</strong> (<em>Sequence</em><em>[</em><em>array_like</em><em>] or </em><em>array_like</em>) – Sequences of items for the X and Y sides. Each item is reduced to its
+mean value inside <cite>munkres_align</cite> for distance computation.</p></li>
+<li><p><strong>x_linked</strong> (<em>array_like</em>) – Auxiliary arrays associated with <cite>x_arr</cite>/<cite>y_arr</cite> that are returned in
+aligned order (e.g., original structures or metadata). Must be
+indexable by the same indices as the corresponding inputs.</p></li>
+<li><p><strong>y_linked</strong> (<em>array_like</em>) – Auxiliary arrays associated with <cite>x_arr</cite>/<cite>y_arr</cite> that are returned in
+aligned order (e.g., original structures or metadata). Must be
+indexable by the same indices as the corresponding inputs.</p></li>
+<li><p><strong>intens_x</strong> (<em>array_like</em>) – Intensity values linked to <cite>x_arr</cite>/<cite>y_arr</cite>. Used to compute
+intensity-aware costs in <cite>munkres_align</cite>.</p></li>
+<li><p><strong>intens_y</strong> (<em>array_like</em>) – Intensity values linked to <cite>x_arr</cite>/<cite>y_arr</cite>. Used to compute
+intensity-aware costs in <cite>munkres_align</cite>.</p></li>
+<li><p><strong>skip_fraction</strong> (<em>float</em><em>, </em><em>optional</em>) – Fraction of extra dummy rows/columns added to each chunk’s cost matrix
+to allow skipping matches. Example: 0.2 means add ~20% rows/cols.</p></li>
+<li><p><strong>skip_level</strong> (<em>float</em><em>, </em><em>optional</em>) – Penalty multiplier applied to the maximum base cost to build dummy
+rows/columns. Larger values discourage skipping.</p></li>
+<li><p><strong>segmentation_threshold</strong> (<em>int</em><em>, </em><em>optional</em>) – Target maximum chunk length. The input is split into roughly
+ceil(len/segmentation_threshold) segments to avoid huge cost matrices
+and memory errors.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>(aln_x, aln_y, aln_x_linked, aln_y_linked) where
+- aln_x, aln_y: lists of items from x_arr/y_arr in aligned order
+- aln_x_linked, aln_y_linked: np.ndarray of linked items aligned with</p>
+<blockquote>
+<div><p>aln_x/aln_y respectively.</p>
+</div></blockquote>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Chunking reduces peak memory: each cost matrix is built per-chunk.</p></li>
+<li><p>Choose <cite>skip_fraction</cite> modestly (e.g., 0.1–0.5); large values can blow up
+the matrix and cause MemoryError.</p></li>
+<li><p>The function preserves per-chunk order; cross-chunk matches are not
+considered. If global cross-chunk matches matter, increase
+<cite>segmentation_threshold</cite> or consider overlapping chunks.</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="alignment.munkres_align">
-<span class="sig-prename descclassname"><span class="pre">alignment.</span></span><span class="sig-name descname"><span class="pre">munkres_align</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x_arr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_arr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_linked</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_linked</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intens_x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intens_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_fraction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.8</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/alignment.html#munkres_align"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#alignment.munkres_align" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">alignment.</span></span><span class="sig-name descname"><span class="pre">munkres_align</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x_arr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_arr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_linked</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_linked</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intens_x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intens_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_fraction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/alignment.html#munkres_align"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#alignment.munkres_align" title="Link to this definition"></a></dt>
 <dd><p>Align two sequences using the Hungarian (Munkres) algorithm with an
 intensity-aware distance cost and optional skipping.</p>
 <dl class="field-list simple">

@@ -79,7 +79,7 @@
 <span class="kn">import</span> <span class="nn">copy</span>
 <span class="kn">import</span> <span class="nn">math</span>
 <span class="kn">import</span> <span class="nn">sys</span>
-<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="kn">import</span> <span class="n">Process</span><span class="p">,</span> <span class="n">Queue</span>
+<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="kn">import</span> <span class="n">Process</span><span class="p">,</span> <span class="n">Queue</span><span class="p">,</span> <span class="n">Pool</span>
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span> <span class="nn">queue</span> <span class="kn">import</span> <span class="n">Empty</span>
 <span class="kn">import</span> <span class="nn">traceback</span>
@@ -193,7 +193,9 @@
             <span class="n">features_raw</span><span class="p">,</span> <span class="n">attrs_raw</span> <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="n">Const</span><span class="o">.</span><span class="n">RAW</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">Const</span><span class="o">.</span><span class="n">DATASET_RAW</span><span class="p">)</span>
             <span class="n">features_aln</span><span class="p">,</span> <span class="n">attrs_aln</span> <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="n">Const</span><span class="o">.</span><span class="n">ALN</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">Const</span><span class="o">.</span><span class="n">DATASET_ALN</span><span class="p">)</span>
 
-            <span class="n">distance_list</span> <span class="o">=</span> <span class="n">read_dataset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">features_raw</span><span class="p">,</span> <span class="n">attrs_raw</span><span class="p">,</span> <span class="n">features_aln</span><span class="p">,</span> <span class="n">attrs_aln</span><span class="p">,</span> <span class="n">Const</span><span class="o">.</span><span class="n">REF</span><span class="p">,</span> <span class="n">Const</span><span class="o">.</span><span class="n">DEV</span><span class="p">)</span>
+            <span class="c1"># включаем параллельную обработку по умолчанию (все ядра минус одно)</span>
+            <span class="n">processes</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">min</span><span class="p">((</span><span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="ow">or</span> <span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+            <span class="n">distance_list</span> <span class="o">=</span> <span class="n">read_dataset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">features_raw</span><span class="p">,</span> <span class="n">attrs_raw</span><span class="p">,</span> <span class="n">features_aln</span><span class="p">,</span> <span class="n">attrs_aln</span><span class="p">,</span> <span class="n">Const</span><span class="o">.</span><span class="n">REF</span><span class="p">,</span> <span class="n">Const</span><span class="o">.</span><span class="n">DEV</span><span class="p">,</span> <span class="n">processes</span><span class="o">=</span><span class="n">processes</span><span class="p">)</span>
 
             <span class="n">distance_list_prepared</span> <span class="o">=</span> <span class="n">prepare_array</span><span class="p">(</span><span class="n">distance_list</span><span class="p">)</span>
             <span class="n">raw_concat</span><span class="p">,</span> <span class="n">aln_concat</span><span class="p">,</span> <span class="n">id_concat</span> <span class="o">=</span> <span class="n">distance_list_prepared</span>
@@ -220,12 +222,13 @@
             <span class="n">peak_lists_raw</span> <span class="o">=</span> <span class="n">sort_dots</span><span class="p">(</span><span class="n">raw_concat</span><span class="p">,</span> <span class="n">c_ds_raw</span><span class="o">.</span><span class="n">linked_array</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">c_ds_raw</span><span class="o">.</span><span class="n">linked_array</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
             <span class="n">peak_lists_aln</span> <span class="o">=</span> <span class="n">sort_dots</span><span class="p">(</span><span class="n">aln_concat</span><span class="p">,</span> <span class="n">c_ds_aln</span><span class="o">.</span><span class="n">linked_array</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">c_ds_aln</span><span class="o">.</span><span class="n">linked_array</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
 
-            <span class="n">aln_peak_lists_raw</span><span class="p">,</span> <span class="n">aln_peak_lists_aln</span><span class="p">,</span> <span class="n">aln_kde_raw</span><span class="p">,</span> <span class="n">aln_kde_aln</span> <span class="o">=</span> <span class="n">alignment</span><span class="o">.</span><span class="n">munkres_align</span><span class="p">(</span><span class="n">peak_lists_raw</span><span class="p">,</span>
-                                                                                                       <span class="n">peak_lists_aln</span><span class="p">,</span>
-                                                                                                       <span class="n">c_ds_raw</span><span class="p">,</span>
-                                                                                                       <span class="n">c_ds_aln</span><span class="p">,</span>
-                                                                                                       <span class="n">c_ds_raw_intensity</span><span class="p">,</span>
-                                                                                                       <span class="n">c_ds_aln_intensity</span><span class="p">)</span>
+            <span class="n">aln_peak_lists_raw</span><span class="p">,</span> <span class="n">aln_peak_lists_aln</span><span class="p">,</span> <span class="n">aln_kde_raw</span><span class="p">,</span> <span class="n">aln_kde_aln</span> <span class="o">=</span> <span class="n">alignment</span><span class="o">.</span><span class="n">munkres</span><span class="p">(</span><span class="n">peak_lists_raw</span><span class="p">,</span>
+                                                                                                 <span class="n">peak_lists_aln</span><span class="p">,</span>
+                                                                                                 <span class="n">c_ds_raw</span><span class="p">,</span>
+                                                                                                 <span class="n">c_ds_aln</span><span class="p">,</span>
+                                                                                                 <span class="n">c_ds_raw_intensity</span><span class="p">,</span>
+                                                                                                 <span class="n">c_ds_aln_intensity</span><span class="p">,</span>
+                                                                                                 <span class="n">segmentation_threshold</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
 
             <span class="n">s_p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
                 <span class="p">[</span><span class="n">stat_params_paired_single</span><span class="p">(</span><span class="n">x_el</span><span class="p">,</span> <span class="n">y_el</span><span class="p">)</span> <span class="k">for</span> <span class="n">x_el</span><span class="p">,</span> <span class="n">y_el</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">aln_peak_lists_raw</span><span class="p">,</span> <span class="n">aln_peak_lists_aln</span><span class="p">)],</span>
@@ -1947,6 +1950,95 @@
 
 
 
+<span class="n">_DATA_RAW</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">_DATA_ALN</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">_IDX</span> <span class="o">=</span> <span class="kc">None</span>          <span class="c1"># (mz_idx_raw, intensity_idx_raw, spectra_idx_raw, mz_idx_aln, intensity_idx_aln, spectra_idx_aln)</span>
+<span class="n">_REF_DEV</span> <span class="o">=</span> <span class="kc">None</span>      <span class="c1"># (REF, DEV)</span>
+
+
+<div class="viewcode-block" id="pool_initializer">
+<a class="viewcode-back" href="../main.html#main.pool_initializer">[docs]</a>
+<span class="k">def</span> <span class="nf">pool_initializer</span><span class="p">(</span><span class="n">data_raw</span><span class="p">,</span> <span class="n">data_aln</span><span class="p">,</span> <span class="n">idx_tuple</span><span class="p">,</span> <span class="n">ref</span><span class="p">,</span> <span class="n">dev</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Pool initializer: store global references to datasets, indices, and params.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    data_raw : ndarray</span>
+<span class="sd">        Raw dataset array loaded from HDF5.</span>
+<span class="sd">    data_aln : ndarray</span>
+<span class="sd">        Aligned dataset array loaded from HDF5.</span>
+<span class="sd">    idx_tuple : tuple[int, int, int, int, int, int]</span>
+<span class="sd">        ``(mz_idx_raw, intensity_idx_raw, spectra_idx_raw, mz_idx_aln,</span>
+<span class="sd">        intensity_idx_aln, spectra_idx_aln)`` indices into the datasets.</span>
+<span class="sd">    ref : float</span>
+<span class="sd">        Reference m/z value for ``find_ref``.</span>
+<span class="sd">    dev : float</span>
+<span class="sd">        Allowed deviation (±) around ``ref`` for reference search.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Stores the arguments into module-level globals (``_DATA_RAW``, ``_DATA_ALN``,</span>
+<span class="sd">    ``_IDX``, ``_REF_DEV``) to avoid repeated pickling and argument passing to</span>
+<span class="sd">    worker processes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_DATA_RAW</span><span class="p">,</span> <span class="n">_DATA_ALN</span><span class="p">,</span> <span class="n">_IDX</span><span class="p">,</span> <span class="n">_REF_DEV</span>
+    <span class="n">_DATA_RAW</span> <span class="o">=</span> <span class="n">data_raw</span>
+    <span class="n">_DATA_ALN</span> <span class="o">=</span> <span class="n">data_aln</span>
+    <span class="n">_IDX</span> <span class="o">=</span> <span class="n">idx_tuple</span>
+    <span class="n">_REF_DEV</span> <span class="o">=</span> <span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="n">dev</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="process_spectrum">
+<a class="viewcode-back" href="../main.html#main.process_spectrum">[docs]</a>
+<span class="k">def</span> <span class="nf">process_spectrum</span><span class="p">(</span><span class="n">task</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Process a single spectrum task and return datasets for raw and aligned.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    task : tuple[int, int, int, int, int]</span>
+<span class="sd">        ``(spec_id, r0, r1, a0, a1)`` where ``[r0:r1]`` and ``[a0:a1]`` are</span>
+<span class="sd">        inclusive slices for raw and aligned blocks belonging to ``spec_id``.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple</span>
+<span class="sd">        ``(spec_id, arr_raw, arr_aln)`` where ``arr_raw`` and ``arr_aln`` are</span>
+<span class="sd">        NumPy arrays representing ``Dataset`` instances for the spectrum.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">spec_id</span><span class="p">,</span> <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span><span class="p">,</span> <span class="n">a0</span><span class="p">,</span> <span class="n">a1</span> <span class="o">=</span> <span class="n">task</span>
+    <span class="n">mz_idx_raw</span><span class="p">,</span> <span class="n">intensity_idx_raw</span><span class="p">,</span> <span class="n">_s_idx_r</span><span class="p">,</span> <span class="n">mz_idx_aln</span><span class="p">,</span> <span class="n">intensity_idx_aln</span><span class="p">,</span> <span class="n">_s_idx_a</span> <span class="o">=</span> <span class="n">_IDX</span>
+    <span class="n">REF</span><span class="p">,</span> <span class="n">DEV</span> <span class="o">=</span> <span class="n">_REF_DEV</span>
+
+    <span class="c1"># извлечь и отсортировать по m/z</span>
+    <span class="n">data_raw_unsorted</span> <span class="o">=</span> <span class="n">_DATA_RAW</span><span class="p">[[</span><span class="n">mz_idx_raw</span><span class="p">,</span> <span class="n">intensity_idx_raw</span><span class="p">],</span> <span class="n">r0</span><span class="p">:</span><span class="n">r1</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">data_aln_unsorted</span> <span class="o">=</span> <span class="n">_DATA_ALN</span><span class="p">[[</span><span class="n">mz_idx_aln</span><span class="p">,</span> <span class="n">intensity_idx_aln</span><span class="p">],</span> <span class="n">a0</span><span class="p">:</span><span class="n">a1</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">order_raw</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">data_raw_unsorted</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">order_aln</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">data_aln_unsorted</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">data_raw</span> <span class="o">=</span> <span class="n">data_raw_unsorted</span><span class="p">[:,</span> <span class="n">order_raw</span><span class="p">]</span>
+    <span class="n">data_aln</span> <span class="o">=</span> <span class="n">data_aln_unsorted</span><span class="p">[:,</span> <span class="n">order_aln</span><span class="p">]</span>
+
+    <span class="n">data_raw_mz</span><span class="p">,</span> <span class="n">data_aln_mz</span> <span class="o">=</span> <span class="n">data_raw</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">data_aln</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">data_raw_int</span><span class="p">,</span> <span class="n">data_aln_int</span> <span class="o">=</span> <span class="n">data_raw</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">data_aln</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">data_raw_linked</span> <span class="o">=</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">data_raw_mz</span><span class="p">,</span> <span class="n">data_raw_int</span><span class="p">)</span>
+    <span class="n">data_aln_linked</span> <span class="o">=</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">data_aln_mz</span><span class="p">,</span> <span class="n">data_aln_int</span><span class="p">)</span>
+
+    <span class="n">checked_raw</span><span class="p">,</span> <span class="n">checked_aln</span> <span class="o">=</span> <span class="n">verify_datasets</span><span class="p">(</span><span class="n">data_raw_linked</span><span class="p">,</span> <span class="n">data_aln_linked</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">_</span><span class="p">,</span> <span class="n">ref_aln</span> <span class="o">=</span> <span class="n">find_ref</span><span class="p">(</span><span class="n">checked_aln</span><span class="p">,</span> <span class="n">REF</span><span class="p">,</span> <span class="n">DEV</span><span class="p">)</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">ref_raw</span> <span class="o">=</span> <span class="n">find_ref</span><span class="p">(</span><span class="n">checked_raw</span><span class="p">,</span> <span class="n">REF</span><span class="p">,</span> <span class="n">DEV</span><span class="p">)</span>
+
+    <span class="n">checked_raw</span><span class="o">.</span><span class="n">reference</span> <span class="o">=</span> <span class="n">ref_raw</span>
+    <span class="n">checked_aln</span><span class="o">.</span><span class="n">reference</span> <span class="o">=</span> <span class="n">ref_aln</span>
+
+    <span class="k">return</span> <span class="n">spec_id</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">checked_raw</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">checked_aln</span><span class="p">)</span></div>
+
+
+
 <div class="viewcode-block" id="find_ref">
 <a class="viewcode-back" href="../main.html#main.find_ref">[docs]</a>
 <span class="k">def</span> <span class="nf">find_ref</span><span class="p">(</span><span class="n">dataset</span><span class="p">:</span> <span class="n">Dataset</span><span class="p">,</span> <span class="n">approx_mz</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">deviation</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
@@ -1982,33 +2074,61 @@
 
 <div class="viewcode-block" id="read_dataset">
 <a class="viewcode-back" href="../main.html#main.read_dataset">[docs]</a>
-<span class="k">def</span> <span class="nf">read_dataset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset_raw</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">attrs_raw</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">dataset_aln</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">attrs_aln</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">REF</span><span class="p">,</span> <span class="n">DEV</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">read_dataset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset_raw</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">attrs_raw</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">dataset_aln</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+                 <span class="n">attrs_aln</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">REF</span><span class="p">,</span> <span class="n">DEV</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">processes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Prepare per-spectrum datasets and emit progress for the UI.</span>
+<span class="sd">    Prepare per-spectrum datasets and emit progress for the UI, with optional</span>
+<span class="sd">    sequential or parallel execution (multiprocessing.Pool).</span>
 
-<span class="sd">    This function extracts m/z and intensity columns, sorts by m/z, verifies</span>
-<span class="sd">    alignment of raw vs. aligned spectra, finds reference peaks, and collects</span>
-<span class="sd">    them into a pair of arrays suitable for downstream processing.</span>
+<span class="sd">    Overview</span>
+<span class="sd">    --------</span>
+<span class="sd">    - Resolve indices of required columns by headers (m/z and intensity).</span>
+<span class="sd">    - Build contiguous segments for each spectrum id based on the spectra index.</span>
+<span class="sd">    - Create tasks only for spectrum ids present in both raw and aligned inputs.</span>
+<span class="sd">    - For each task: slice the subarrays, sort by m/z, verify alignment</span>
+<span class="sd">      (``verify_datasets``), find a reference peak around ``REF`` within ``DEV``</span>
+<span class="sd">      (``find_ref``), and store the result as a ``Dataset`` with a ``reference``.</span>
+<span class="sd">    - Emit progress after each spectrum is processed.</span>
+
+<span class="sd">    Modes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - Sequential (``processes &lt;= 0``): runs in the main thread, preserving</span>
+<span class="sd">      existing variable names and logic.</span>
+<span class="sd">    - Parallel (``processes &gt; 0``): uses ``multiprocessing.Pool`` with an</span>
+<span class="sd">      initializer (``pool_initializer``) and worker (``process_spectrum``).</span>
+<span class="sd">      Tasks are processed in parallel; results may arrive unordered and are</span>
+<span class="sd">      placed by ``spec_id``.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    self : WorkerSignals</span>
-<span class="sd">        Object used to emit progress-related signals.</span>
+<span class="sd">        Object used to emit progress bar initialization and updates.</span>
 <span class="sd">    dataset_raw, dataset_aln : ndarray</span>
 <span class="sd">        Raw and aligned datasets read from HDF5.</span>
-<span class="sd">    attrs_raw, attrs_aln : list</span>
+<span class="sd">    attrs_raw, attrs_aln : list of str</span>
 <span class="sd">        Column headers for the respective datasets.</span>
 <span class="sd">    REF : float</span>
 <span class="sd">        Reference m/z seed.</span>
 <span class="sd">    DEV : float</span>
-<span class="sd">        Acceptable deviation around `REF`.</span>
+<span class="sd">        Acceptable deviation (±) around ``REF`` for reference search.</span>
 <span class="sd">    limit : int or None, optional</span>
 <span class="sd">        Optional limit on the number of spectra to process (debugging).</span>
+<span class="sd">    processes : int, optional</span>
+<span class="sd">        Number of processes for ``multiprocessing.Pool``. ``&lt;= 0`` means</span>
+<span class="sd">        sequential mode. Default is 0.</span>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
 <span class="sd">    ndarray</span>
-<span class="sd">        2 x N object array of Dataset-like sequences (raw, aligned) by spectrum index.</span>
+<span class="sd">        Array of shape ``(2, N)`` with ``dtype=Dataset``, where ``N`` is the</span>
+<span class="sd">        number of processed spectra. ``dataset_list[0, spec_id]`` corresponds to</span>
+<span class="sd">        the raw dataset; ``dataset_list[1, spec_id]`` to the aligned dataset.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - Only spectrum ids present in both raw and aligned datasets are processed.</span>
+<span class="sd">    - The progress bar is initialized based on the number of tasks (common ids).</span>
+<span class="sd">    - In parallel mode, result arrival order is not guaranteed.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">row_raw</span> <span class="o">=</span> <span class="n">DatasetHeaders</span><span class="p">(</span><span class="n">attrs_raw</span><span class="p">)</span>
@@ -2043,36 +2163,105 @@
 
     <span class="n">dataset_list</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="n">set_num</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">Dataset</span><span class="p">)</span>
 
-    <span class="bp">self</span><span class="o">.</span><span class="n">create_pbar</span><span class="o">.</span><span class="n">emit</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span><span class="n">end_index</span><span class="o">-</span><span class="n">start_index</span><span class="p">))</span>
+    <span class="c1"># предрасчёт сегментов по каждому индексу спектра</span>
+    <span class="n">segments_raw</span> <span class="o">=</span> <span class="n">build_segments</span><span class="p">(</span><span class="n">index_row_raw</span><span class="p">)</span>
+    <span class="n">segments_aln</span> <span class="o">=</span> <span class="n">build_segments</span><span class="p">(</span><span class="n">index_row_aln</span><span class="p">)</span>
 
-    <span class="k">for</span> <span class="n">spec_n</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">start_index</span><span class="p">,</span><span class="n">end_index</span><span class="o">+</span><span class="mi">1</span><span class="p">)):</span>
-        <span class="n">index_raw</span><span class="p">,</span> <span class="n">index_aln</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">index_row_raw</span> <span class="o">==</span> <span class="n">index</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">index_row_aln</span> <span class="o">==</span> <span class="n">index</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="c1"># get_index(dataset_raw, index), get_index(dataset_aln, index)</span>
-        <span class="n">data_raw_unsorted</span> <span class="o">=</span> <span class="n">dataset_raw</span><span class="p">[</span><span class="n">row_raw</span><span class="p">([</span><span class="n">mz_type</span><span class="p">,</span><span class="n">int_type</span><span class="p">]),</span><span class="n">index_raw</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span><span class="n">index_raw</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
-        <span class="n">data_aln_unsorted</span> <span class="o">=</span> <span class="n">dataset_aln</span><span class="p">[</span><span class="n">row_aln</span><span class="p">([</span><span class="n">mz_type</span><span class="p">,</span><span class="n">int_type</span><span class="p">]),</span><span class="n">index_aln</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span><span class="n">index_aln</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="c1"># список задач только для тех индексов, которые есть и в raw, и в aln</span>
+    <span class="n">tasks</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">spec_id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start_index</span><span class="p">,</span> <span class="n">end_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">spec_id</span> <span class="ow">in</span> <span class="n">segments_raw</span> <span class="ow">and</span> <span class="n">spec_id</span> <span class="ow">in</span> <span class="n">segments_aln</span><span class="p">:</span>
+            <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span> <span class="o">=</span> <span class="n">segments_raw</span><span class="p">[</span><span class="n">spec_id</span><span class="p">]</span>
+            <span class="n">a0</span><span class="p">,</span> <span class="n">a1</span> <span class="o">=</span> <span class="n">segments_aln</span><span class="p">[</span><span class="n">spec_id</span><span class="p">]</span>
+            <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">spec_id</span><span class="p">,</span> <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span><span class="p">,</span> <span class="n">a0</span><span class="p">,</span> <span class="n">a1</span><span class="p">))</span>
 
-        <span class="n">data_raw</span> <span class="o">=</span> <span class="n">data_raw_unsorted</span><span class="p">[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">data_raw_unsorted</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]]</span>
-        <span class="n">data_aln</span> <span class="o">=</span> <span class="n">data_aln_unsorted</span><span class="p">[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">data_aln_unsorted</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]]</span>
+    <span class="c1"># инициализация прогресса по числу задач</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">create_pbar</span><span class="o">.</span><span class="n">emit</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">tasks</span><span class="p">)))</span>
 
-        <span class="n">data_raw_mz</span><span class="p">,</span> <span class="n">data_aln_mz</span> <span class="o">=</span> <span class="n">data_raw</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">data_aln</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="n">data_raw_int</span><span class="p">,</span> <span class="n">data_aln_int</span> <span class="o">=</span> <span class="n">data_raw</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">data_aln</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="c1"># последовательная ветка — сохранить существующую логику имен/переменных</span>
+    <span class="k">if</span> <span class="n">processes</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">spec_n</span><span class="p">,</span> <span class="p">(</span><span class="n">spec_id</span><span class="p">,</span> <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span><span class="p">,</span> <span class="n">a0</span><span class="p">,</span> <span class="n">a1</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">tasks</span><span class="p">):</span>
+            <span class="n">index_raw</span><span class="p">,</span> <span class="n">index_aln</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">index_row_raw</span> <span class="o">==</span> <span class="n">spec_id</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">index_row_aln</span> <span class="o">==</span> <span class="n">spec_id</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">data_raw_unsorted</span> <span class="o">=</span> <span class="n">dataset_raw</span><span class="p">[</span><span class="n">row_raw</span><span class="p">([</span><span class="n">mz_type</span><span class="p">,</span><span class="n">int_type</span><span class="p">]),</span> <span class="n">index_raw</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span><span class="n">index_raw</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="n">data_aln_unsorted</span> <span class="o">=</span> <span class="n">dataset_aln</span><span class="p">[</span><span class="n">row_aln</span><span class="p">([</span><span class="n">mz_type</span><span class="p">,</span><span class="n">int_type</span><span class="p">]),</span> <span class="n">index_aln</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span><span class="n">index_aln</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
 
-        <span class="n">data_raw_linked</span> <span class="o">=</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">data_raw_mz</span><span class="p">,</span> <span class="n">data_raw_int</span><span class="p">)</span>
-        <span class="n">data_aln_linked</span> <span class="o">=</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">data_aln_mz</span><span class="p">,</span> <span class="n">data_aln_int</span><span class="p">)</span>
+            <span class="n">data_raw</span> <span class="o">=</span> <span class="n">data_raw_unsorted</span><span class="p">[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">data_raw_unsorted</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">data_aln</span> <span class="o">=</span> <span class="n">data_aln_unsorted</span><span class="p">[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">data_aln_unsorted</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]]</span>
 
-        <span class="n">checked_raw</span><span class="p">,</span> <span class="n">checked_aln</span> <span class="o">=</span> <span class="n">verify_datasets</span><span class="p">(</span><span class="n">data_raw_linked</span><span class="p">,</span> <span class="n">data_aln_linked</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">data_raw_mz</span><span class="p">,</span> <span class="n">data_aln_mz</span> <span class="o">=</span> <span class="n">data_raw</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">data_aln</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">data_raw_int</span><span class="p">,</span> <span class="n">data_aln_int</span> <span class="o">=</span> <span class="n">data_raw</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">data_aln</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 
-        <span class="n">_</span><span class="p">,</span> <span class="n">ref_aln</span> <span class="o">=</span> <span class="n">find_ref</span><span class="p">(</span><span class="n">checked_aln</span><span class="p">,</span> <span class="n">REF</span><span class="p">,</span> <span class="n">DEV</span><span class="p">)</span>
-        <span class="n">_</span><span class="p">,</span> <span class="n">ref_raw</span> <span class="o">=</span> <span class="n">find_ref</span><span class="p">(</span><span class="n">checked_raw</span><span class="p">,</span> <span class="n">REF</span><span class="p">,</span> <span class="n">DEV</span><span class="p">)</span>
+            <span class="n">data_raw_linked</span> <span class="o">=</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">data_raw_mz</span><span class="p">,</span> <span class="n">data_raw_int</span><span class="p">)</span>
+            <span class="n">data_aln_linked</span> <span class="o">=</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">data_aln_mz</span><span class="p">,</span> <span class="n">data_aln_int</span><span class="p">)</span>
 
-        <span class="n">checked_raw</span><span class="o">.</span><span class="n">reference</span> <span class="o">=</span> <span class="n">ref_raw</span>
-        <span class="n">checked_aln</span><span class="o">.</span><span class="n">reference</span> <span class="o">=</span> <span class="n">ref_aln</span>
+            <span class="n">checked_raw</span><span class="p">,</span> <span class="n">checked_aln</span> <span class="o">=</span> <span class="n">verify_datasets</span><span class="p">(</span><span class="n">data_raw_linked</span><span class="p">,</span> <span class="n">data_aln_linked</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
-        <span class="n">dataset_list</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">checked_raw</span><span class="p">)</span>  <span class="c1"># - checked_raw.reference</span>
-        <span class="n">dataset_list</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">checked_aln</span><span class="p">)</span>  <span class="c1"># - checked_aln.reference</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">progress</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">spec_n</span><span class="p">)</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">ref_aln</span> <span class="o">=</span> <span class="n">find_ref</span><span class="p">(</span><span class="n">checked_aln</span><span class="p">,</span> <span class="n">REF</span><span class="p">,</span> <span class="n">DEV</span><span class="p">)</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">ref_raw</span> <span class="o">=</span> <span class="n">find_ref</span><span class="p">(</span><span class="n">checked_raw</span><span class="p">,</span> <span class="n">REF</span><span class="p">,</span> <span class="n">DEV</span><span class="p">)</span>
+
+            <span class="n">checked_raw</span><span class="o">.</span><span class="n">reference</span> <span class="o">=</span> <span class="n">ref_raw</span>
+            <span class="n">checked_aln</span><span class="o">.</span><span class="n">reference</span> <span class="o">=</span> <span class="n">ref_aln</span>
+
+            <span class="n">dataset_list</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">spec_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">checked_raw</span><span class="p">)</span>
+            <span class="n">dataset_list</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">spec_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">checked_aln</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">progress</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">spec_n</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dataset_list</span>
+
+    <span class="c1"># параллельная ветка — Pool с минимальными изменениями</span>
+    <span class="n">mz_idx_raw</span> <span class="o">=</span> <span class="n">row_raw</span><span class="p">(</span><span class="n">mz_type</span><span class="p">)</span>
+    <span class="n">intensity_idx_raw</span> <span class="o">=</span> <span class="n">row_raw</span><span class="p">(</span><span class="n">int_type</span><span class="p">)</span>
+    <span class="n">spectra_idx_raw</span> <span class="o">=</span> <span class="n">row_raw</span><span class="p">(</span><span class="s2">&quot;spectra_ind&quot;</span><span class="p">)</span>
+
+    <span class="n">mz_idx_aln</span> <span class="o">=</span> <span class="n">row_aln</span><span class="p">(</span><span class="n">mz_type</span><span class="p">)</span>
+    <span class="n">intensity_idx_aln</span> <span class="o">=</span> <span class="n">row_aln</span><span class="p">(</span><span class="n">int_type</span><span class="p">)</span>
+    <span class="n">spectra_idx_aln</span> <span class="o">=</span> <span class="n">row_aln</span><span class="p">(</span><span class="s2">&quot;spectra_ind&quot;</span><span class="p">)</span>
+
+    <span class="n">init_args</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">dataset_raw</span><span class="p">,</span>
+        <span class="n">dataset_aln</span><span class="p">,</span>
+        <span class="p">(</span><span class="n">mz_idx_raw</span><span class="p">,</span> <span class="n">intensity_idx_raw</span><span class="p">,</span> <span class="n">spectra_idx_raw</span><span class="p">,</span>
+         <span class="n">mz_idx_aln</span><span class="p">,</span> <span class="n">intensity_idx_aln</span><span class="p">,</span> <span class="n">spectra_idx_aln</span><span class="p">),</span>
+        <span class="n">REF</span><span class="p">,</span> <span class="n">DEV</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">Pool</span><span class="p">(</span><span class="n">processes</span><span class="o">=</span><span class="n">processes</span><span class="p">,</span> <span class="n">initializer</span><span class="o">=</span><span class="n">pool_initializer</span><span class="p">,</span> <span class="n">initargs</span><span class="o">=</span><span class="n">init_args</span><span class="p">)</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">spec_n</span><span class="p">,</span> <span class="p">(</span><span class="n">spec_id</span><span class="p">,</span> <span class="n">arr_raw</span><span class="p">,</span> <span class="n">arr_aln</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span><span class="n">process_spectrum</span><span class="p">,</span> <span class="n">tasks</span><span class="p">)):</span>
+            <span class="n">dataset_list</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">spec_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">arr_raw</span>
+            <span class="n">dataset_list</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">spec_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">arr_aln</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">progress</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">spec_n</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">dataset_list</span></div>
+
+
+
+<div class="viewcode-block" id="build_segments">
+<a class="viewcode-back" href="../main.html#main.build_segments">[docs]</a>
+<span class="k">def</span> <span class="nf">build_segments</span><span class="p">(</span><span class="n">spectra_index_row</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Build contiguous [start, end] slices for each value of ``spectra_ind``.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    spectra_index_row : ndarray</span>
+<span class="sd">        1-D array of spectrum identifiers, typically the ``spectra_ind`` row</span>
+<span class="sd">        from an HDF5 dataset.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict[int, tuple[int, int]]</span>
+<span class="sd">        Mapping from spectrum id to an inclusive ``(start, end)`` slice within</span>
+<span class="sd">        ``spectra_index_row`` covering its contiguous block.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">segments</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">spectra_index_row</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">segments</span>
+    <span class="n">change_pos</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">spectra_index_row</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">starts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(([</span><span class="mi">0</span><span class="p">],</span> <span class="n">change_pos</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">ends</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">change_pos</span><span class="p">,</span> <span class="p">[</span><span class="n">spectra_index_row</span><span class="o">.</span><span class="n">size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]))</span>
+    <span class="n">ids</span> <span class="o">=</span> <span class="n">spectra_index_row</span><span class="p">[</span><span class="n">ends</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">s</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">spec_id</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">starts</span><span class="p">,</span> <span class="n">ends</span><span class="p">,</span> <span class="n">ids</span><span class="p">):</span>
+        <span class="n">segments</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">spec_id</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">s</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">segments</span></div>
 
 
 
@@ -2231,7 +2420,7 @@
 
 <div class="viewcode-block" id="out_criteria">
 <a class="viewcode-back" href="../main.html#main.out_criteria">[docs]</a>
-<span class="k">def</span> <span class="nf">out_criteria</span><span class="p">(</span><span class="n">mz</span><span class="p">,</span> <span class="n">intensity</span><span class="p">,</span> <span class="n">int_threshold</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span> <span class="n">max_diff</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">,</span> <span class="n">width_eps</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">):</span><span class="c1"># TODO: add documentation (see TG for descr.)</span>
+<span class="k">def</span> <span class="nf">out_criteria</span><span class="p">(</span><span class="n">mz</span><span class="p">,</span> <span class="n">intensity</span><span class="p">,</span> <span class="n">int_threshold</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span> <span class="n">max_diff</span> <span class="o">=</span> <span class="mf">0.4</span><span class="p">,</span> <span class="n">width_eps</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">):</span><span class="c1"># TODO: add documentation (see TG for descr.)</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Identify outlier peak intervals based on intensity and width heuristics.</span>
 
@@ -2300,6 +2489,7 @@
     <span class="n">main_window</span><span class="o">.</span><span class="n">showMaximized</span><span class="p">()</span>
 
     <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">app</span><span class="o">.</span><span class="n">exec_</span><span class="p">())</span>
+
 </pre></div>
 
            </div>

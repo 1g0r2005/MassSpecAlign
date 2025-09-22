@@ -5,13 +5,12 @@ os.environ['PYQTGRAPH_QT_LIB'] = 'PyQt5'
 import copy
 import math
 import sys
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Pool
 from pathlib import Path
 from queue import Empty
 import traceback
 
 import h5py
-import numpy as np
 import pyqtgraph as pg
 import scipy.stats as stats
 import yaml
@@ -112,7 +111,9 @@ class WorkerSignals(QObject):
             features_raw, attrs_raw = File(Const.RAW).read(Const.DATASET_RAW)
             features_aln, attrs_aln = File(Const.ALN).read(Const.DATASET_ALN)
 
-            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV)
+            # включаем параллельную обработку по умолчанию (все ядра минус одно)
+            processes = max(1, min((os.cpu_count() or 2) - 1,3))
+            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV, processes=processes)
 
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -139,12 +140,13 @@ class WorkerSignals(QObject):
             peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
             peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = alignment.munkres_align(peak_lists_raw,
-                                                                                                       peak_lists_aln,
-                                                                                                       c_ds_raw,
-                                                                                                       c_ds_aln,
-                                                                                                       c_ds_raw_intensity,
-                                                                                                       c_ds_aln_intensity)
+            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = alignment.munkres(peak_lists_raw,
+                                                                                                 peak_lists_aln,
+                                                                                                 c_ds_raw,
+                                                                                                 c_ds_aln,
+                                                                                                 c_ds_raw_intensity,
+                                                                                                 c_ds_aln_intensity,
+                                                                                                 segmentation_threshold=400)
 
             s_p = np.array(
                 [stat_params_paired_single(x_el, y_el) for x_el, y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],
@@ -1714,6 +1716,89 @@ def verify_datasets(data_1: LinkedList, data_2: LinkedList, threshold=1.0) -> (L
     return data1_new, data2_new
 
 
+_DATA_RAW = None
+_DATA_ALN = None
+_IDX = None          # (mz_idx_raw, intensity_idx_raw, spectra_idx_raw, mz_idx_aln, intensity_idx_aln, spectra_idx_aln)
+_REF_DEV = None      # (REF, DEV)
+
+
+def pool_initializer(data_raw, data_aln, idx_tuple, ref, dev):
+    """
+    Pool initializer: store global references to datasets, indices, and params.
+
+    Parameters
+    ----------
+    data_raw : ndarray
+        Raw dataset array loaded from HDF5.
+    data_aln : ndarray
+        Aligned dataset array loaded from HDF5.
+    idx_tuple : tuple[int, int, int, int, int, int]
+        ``(mz_idx_raw, intensity_idx_raw, spectra_idx_raw, mz_idx_aln,
+        intensity_idx_aln, spectra_idx_aln)`` indices into the datasets.
+    ref : float
+        Reference m/z value for ``find_ref``.
+    dev : float
+        Allowed deviation (±) around ``ref`` for reference search.
+
+    Notes
+    -----
+    Stores the arguments into module-level globals (``_DATA_RAW``, ``_DATA_ALN``,
+    ``_IDX``, ``_REF_DEV``) to avoid repeated pickling and argument passing to
+    worker processes.
+    """
+    global _DATA_RAW, _DATA_ALN, _IDX, _REF_DEV
+    _DATA_RAW = data_raw
+    _DATA_ALN = data_aln
+    _IDX = idx_tuple
+    _REF_DEV = (ref, dev)
+
+
+def process_spectrum(task):
+    """
+    Process a single spectrum task and return datasets for raw and aligned.
+
+    Parameters
+    ----------
+    task : tuple[int, int, int, int, int]
+        ``(spec_id, r0, r1, a0, a1)`` where ``[r0:r1]`` and ``[a0:a1]`` are
+        inclusive slices for raw and aligned blocks belonging to ``spec_id``.
+
+    Returns
+    -------
+    tuple
+        ``(spec_id, arr_raw, arr_aln)`` where ``arr_raw`` and ``arr_aln`` are
+        NumPy arrays representing ``Dataset`` instances for the spectrum.
+    """
+    spec_id, r0, r1, a0, a1 = task
+    mz_idx_raw, intensity_idx_raw, _s_idx_r, mz_idx_aln, intensity_idx_aln, _s_idx_a = _IDX
+    REF, DEV = _REF_DEV
+
+    # извлечь и отсортировать по m/z
+    data_raw_unsorted = _DATA_RAW[[mz_idx_raw, intensity_idx_raw], r0:r1 + 1]
+    data_aln_unsorted = _DATA_ALN[[mz_idx_aln, intensity_idx_aln], a0:a1 + 1]
+
+    order_raw = np.argsort(data_raw_unsorted[0])
+    order_aln = np.argsort(data_aln_unsorted[0])
+    data_raw = data_raw_unsorted[:, order_raw]
+    data_aln = data_aln_unsorted[:, order_aln]
+
+    data_raw_mz, data_aln_mz = data_raw[0], data_aln[0]
+    data_raw_int, data_aln_int = data_raw[1], data_aln[1]
+
+    data_raw_linked = Dataset(data_raw_mz, data_raw_int)
+    data_aln_linked = Dataset(data_aln_mz, data_aln_int)
+
+    checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
+
+    _, ref_aln = find_ref(checked_aln, REF, DEV)
+    _, ref_raw = find_ref(checked_raw, REF, DEV)
+
+    checked_raw.reference = ref_raw
+    checked_aln.reference = ref_aln
+
+    return spec_id, np.array(checked_raw), np.array(checked_aln)
+
+
 def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0) -> [float, float]:
     """
     Locate a reference peak near an approximate m/z within a deviation window.
@@ -1744,33 +1829,61 @@ def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0) -> [float, float
     return ref_index, dataset[ref_index]
 
 
-def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np.ndarray, attrs_aln: list, REF, DEV, limit=None):
+def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np.ndarray,
+                 attrs_aln: list, REF, DEV, limit=None, processes: int = 0):
     """
-    Prepare per-spectrum datasets and emit progress for the UI.
+    Prepare per-spectrum datasets and emit progress for the UI, with optional
+    sequential or parallel execution (multiprocessing.Pool).
 
-    This function extracts m/z and intensity columns, sorts by m/z, verifies
-    alignment of raw vs. aligned spectra, finds reference peaks, and collects
-    them into a pair of arrays suitable for downstream processing.
+    Overview
+    --------
+    - Resolve indices of required columns by headers (m/z and intensity).
+    - Build contiguous segments for each spectrum id based on the spectra index.
+    - Create tasks only for spectrum ids present in both raw and aligned inputs.
+    - For each task: slice the subarrays, sort by m/z, verify alignment
+      (``verify_datasets``), find a reference peak around ``REF`` within ``DEV``
+      (``find_ref``), and store the result as a ``Dataset`` with a ``reference``.
+    - Emit progress after each spectrum is processed.
+
+    Modes
+    -----
+    - Sequential (``processes <= 0``): runs in the main thread, preserving
+      existing variable names and logic.
+    - Parallel (``processes > 0``): uses ``multiprocessing.Pool`` with an
+      initializer (``pool_initializer``) and worker (``process_spectrum``).
+      Tasks are processed in parallel; results may arrive unordered and are
+      placed by ``spec_id``.
 
     Parameters
     ----------
     self : WorkerSignals
-        Object used to emit progress-related signals.
+        Object used to emit progress bar initialization and updates.
     dataset_raw, dataset_aln : ndarray
         Raw and aligned datasets read from HDF5.
-    attrs_raw, attrs_aln : list
+    attrs_raw, attrs_aln : list of str
         Column headers for the respective datasets.
     REF : float
         Reference m/z seed.
     DEV : float
-        Acceptable deviation around `REF`.
+        Acceptable deviation (±) around ``REF`` for reference search.
     limit : int or None, optional
         Optional limit on the number of spectra to process (debugging).
+    processes : int, optional
+        Number of processes for ``multiprocessing.Pool``. ``<= 0`` means
+        sequential mode. Default is 0.
 
     Returns
     -------
     ndarray
-        2 x N object array of Dataset-like sequences (raw, aligned) by spectrum index.
+        Array of shape ``(2, N)`` with ``dtype=Dataset``, where ``N`` is the
+        number of processed spectra. ``dataset_list[0, spec_id]`` corresponds to
+        the raw dataset; ``dataset_list[1, spec_id]`` to the aligned dataset.
+
+    Notes
+    -----
+    - Only spectrum ids present in both raw and aligned datasets are processed.
+    - The progress bar is initialized based on the number of tasks (common ids).
+    - In parallel mode, result arrival order is not guaranteed.
     """
 
     row_raw = DatasetHeaders(attrs_raw)
@@ -1805,36 +1918,102 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
 
     dataset_list = np.empty((2, set_num), dtype=Dataset)
 
-    self.create_pbar.emit((0,end_index-start_index))
+    # предрасчёт сегментов по каждому индексу спектра
+    segments_raw = build_segments(index_row_raw)
+    segments_aln = build_segments(index_row_aln)
 
-    for spec_n, index in enumerate(range(start_index,end_index+1)):
-        index_raw, index_aln = np.where(index_row_raw == index)[0], np.where(index_row_aln == index)[0]
-        # get_index(dataset_raw, index), get_index(dataset_aln, index)
-        data_raw_unsorted = dataset_raw[row_raw([mz_type,int_type]),index_raw[0]:index_raw[-1] + 1]
-        data_aln_unsorted = dataset_aln[row_aln([mz_type,int_type]),index_aln[0]:index_aln[-1] + 1]
+    # список задач только для тех индексов, которые есть и в raw, и в aln
+    tasks = []
+    for spec_id in range(start_index, end_index + 1):
+        if spec_id in segments_raw and spec_id in segments_aln:
+            r0, r1 = segments_raw[spec_id]
+            a0, a1 = segments_aln[spec_id]
+            tasks.append((spec_id, r0, r1, a0, a1))
 
-        data_raw = data_raw_unsorted[:, np.argsort(data_raw_unsorted, axis=1)[0]]
-        data_aln = data_aln_unsorted[:, np.argsort(data_aln_unsorted, axis=1)[0]]
+    # инициализация прогресса по числу задач
+    self.create_pbar.emit((0, len(tasks)))
 
-        data_raw_mz, data_aln_mz = data_raw[0], data_aln[0]
-        data_raw_int, data_aln_int = data_raw[1], data_aln[1]
+    # последовательная ветка — сохранить существующую логику имен/переменных
+    if processes <= 0:
+        for spec_n, (spec_id, r0, r1, a0, a1) in enumerate(tasks):
+            index_raw, index_aln = np.where(index_row_raw == spec_id)[0], np.where(index_row_aln == spec_id)[0]
+            data_raw_unsorted = dataset_raw[row_raw([mz_type,int_type]), index_raw[0]:index_raw[-1] + 1]
+            data_aln_unsorted = dataset_aln[row_aln([mz_type,int_type]), index_aln[0]:index_aln[-1] + 1]
 
-        data_raw_linked = Dataset(data_raw_mz, data_raw_int)
-        data_aln_linked = Dataset(data_aln_mz, data_aln_int)
+            data_raw = data_raw_unsorted[:, np.argsort(data_raw_unsorted, axis=1)[0]]
+            data_aln = data_aln_unsorted[:, np.argsort(data_aln_unsorted, axis=1)[0]]
 
-        checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
+            data_raw_mz, data_aln_mz = data_raw[0], data_aln[0]
+            data_raw_int, data_aln_int = data_raw[1], data_aln[1]
 
-        _, ref_aln = find_ref(checked_aln, REF, DEV)
-        _, ref_raw = find_ref(checked_raw, REF, DEV)
+            data_raw_linked = Dataset(data_raw_mz, data_raw_int)
+            data_aln_linked = Dataset(data_aln_mz, data_aln_int)
 
-        checked_raw.reference = ref_raw
-        checked_aln.reference = ref_aln
+            checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
 
-        dataset_list[0, index] = np.array(checked_raw)  # - checked_raw.reference
-        dataset_list[1, index] = np.array(checked_aln)  # - checked_aln.reference
-        self.progress.emit(spec_n)
+            _, ref_aln = find_ref(checked_aln, REF, DEV)
+            _, ref_raw = find_ref(checked_raw, REF, DEV)
+
+            checked_raw.reference = ref_raw
+            checked_aln.reference = ref_aln
+
+            dataset_list[0, spec_id] = np.array(checked_raw)
+            dataset_list[1, spec_id] = np.array(checked_aln)
+            self.progress.emit(spec_n)
+        return dataset_list
+
+    # параллельная ветка — Pool с минимальными изменениями
+    mz_idx_raw = row_raw(mz_type)
+    intensity_idx_raw = row_raw(int_type)
+    spectra_idx_raw = row_raw("spectra_ind")
+
+    mz_idx_aln = row_aln(mz_type)
+    intensity_idx_aln = row_aln(int_type)
+    spectra_idx_aln = row_aln("spectra_ind")
+
+    init_args = (
+        dataset_raw,
+        dataset_aln,
+        (mz_idx_raw, intensity_idx_raw, spectra_idx_raw,
+         mz_idx_aln, intensity_idx_aln, spectra_idx_aln),
+        REF, DEV,
+    )
+
+    with Pool(processes=processes, initializer=pool_initializer, initargs=init_args) as pool:
+        for spec_n, (spec_id, arr_raw, arr_aln) in enumerate(pool.imap_unordered(process_spectrum, tasks)):
+            dataset_list[0, spec_id] = arr_raw
+            dataset_list[1, spec_id] = arr_aln
+            self.progress.emit(spec_n)
 
     return dataset_list
+
+
+def build_segments(spectra_index_row: np.ndarray) -> dict[int, tuple[int, int]]:
+    """
+    Build contiguous [start, end] slices for each value of ``spectra_ind``.
+
+    Parameters
+    ----------
+    spectra_index_row : ndarray
+        1-D array of spectrum identifiers, typically the ``spectra_ind`` row
+        from an HDF5 dataset.
+
+    Returns
+    -------
+    dict[int, tuple[int, int]]
+        Mapping from spectrum id to an inclusive ``(start, end)`` slice within
+        ``spectra_index_row`` covering its contiguous block.
+    """
+    segments: dict[int, tuple[int, int]] = {}
+    if spectra_index_row.size == 0:
+        return segments
+    change_pos = np.where(np.diff(spectra_index_row) != 0)[0]
+    starts = np.concatenate(([0], change_pos + 1))
+    ends = np.concatenate((change_pos, [spectra_index_row.size - 1]))
+    ids = spectra_index_row[ends]
+    for s, e, spec_id in zip(starts, ends, ids):
+        segments[int(spec_id)] = (int(s), int(e))
+    return segments
 
 
 def prepare_array(distances):
@@ -1975,7 +2154,7 @@ def moving_average(a, n=2):
     return ret[n - 1:] / n
 
 
-def out_criteria(mz, intensity, int_threshold = 0.01, max_diff = 0.3, width_eps = 0.1):# TODO: add documentation (see TG for descr.)
+def out_criteria(mz, intensity, int_threshold = 0.01, max_diff = 0.4, width_eps = 0.1):
     """
     Identify outlier peak intervals based on intensity and width heuristics.
 
@@ -2040,3 +2219,4 @@ if __name__ == '__main__':
     main_window.showMaximized()
 
     sys.exit(app.exec_())
+

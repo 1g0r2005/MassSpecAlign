@@ -134,6 +134,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#main.WorkerSignals.find_dots_process"><code class="docutils literal notranslate"><span class="pre">WorkerSignals.find_dots_process()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="#main.build_segments"><code class="docutils literal notranslate"><span class="pre">build_segments()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.concover"><code class="docutils literal notranslate"><span class="pre">concover()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.criteria_apply"><code class="docutils literal notranslate"><span class="pre">criteria_apply()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.find_ref"><code class="docutils literal notranslate"><span class="pre">find_ref()</span></code></a></li>
@@ -142,7 +143,9 @@
 <li class="toctree-l3"><a class="reference internal" href="#main.moving_average"><code class="docutils literal notranslate"><span class="pre">moving_average()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.out_criteria"><code class="docutils literal notranslate"><span class="pre">out_criteria()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.peak_picking"><code class="docutils literal notranslate"><span class="pre">peak_picking()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.pool_initializer"><code class="docutils literal notranslate"><span class="pre">pool_initializer()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.prepare_array"><code class="docutils literal notranslate"><span class="pre">prepare_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.process_spectrum"><code class="docutils literal notranslate"><span class="pre">process_spectrum()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.read_dataset"><code class="docutils literal notranslate"><span class="pre">read_dataset()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.sort_dots"><code class="docutils literal notranslate"><span class="pre">sort_dots()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.stat_params_paired_single"><code class="docutils literal notranslate"><span class="pre">stat_params_paired_single()</span></code></a></li>
@@ -241,6 +244,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#main.WorkerSignals.find_dots_process"><code class="docutils literal notranslate"><span class="pre">WorkerSignals.find_dots_process()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#main.build_segments"><code class="docutils literal notranslate"><span class="pre">build_segments()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.concover"><code class="docutils literal notranslate"><span class="pre">concover()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.criteria_apply"><code class="docutils literal notranslate"><span class="pre">criteria_apply()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.find_ref"><code class="docutils literal notranslate"><span class="pre">find_ref()</span></code></a></li>
@@ -249,7 +253,9 @@
 <li class="toctree-l2"><a class="reference internal" href="#main.moving_average"><code class="docutils literal notranslate"><span class="pre">moving_average()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.out_criteria"><code class="docutils literal notranslate"><span class="pre">out_criteria()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.peak_picking"><code class="docutils literal notranslate"><span class="pre">peak_picking()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.pool_initializer"><code class="docutils literal notranslate"><span class="pre">pool_initializer()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.prepare_array"><code class="docutils literal notranslate"><span class="pre">prepare_array()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.process_spectrum"><code class="docutils literal notranslate"><span class="pre">process_spectrum()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.read_dataset"><code class="docutils literal notranslate"><span class="pre">read_dataset()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.sort_dots"><code class="docutils literal notranslate"><span class="pre">sort_dots()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.stat_params_paired_single"><code class="docutils literal notranslate"><span class="pre">stat_params_paired_single()</span></code></a></li>
@@ -1009,6 +1015,25 @@ descriptive and inferential statistics. Results are emitted via the
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="main.build_segments">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">build_segments</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spectra_index_row</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/main.html#build_segments"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.build_segments" title="Link to this definition"></a></dt>
+<dd><p>Build contiguous [start, end] slices for each value of <code class="docutils literal notranslate"><span class="pre">spectra_ind</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>spectra_index_row</strong> (<em>ndarray</em>) – 1-D array of spectrum identifiers, typically the <code class="docutils literal notranslate"><span class="pre">spectra_ind</span></code> row
+from an HDF5 dataset.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Mapping from spectrum id to an inclusive <code class="docutils literal notranslate"><span class="pre">(start,</span> <span class="pre">end)</span></code> slice within
+<code class="docutils literal notranslate"><span class="pre">spectra_index_row</span></code> covering its contiguous block.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict[int, tuple[int, int]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="main.concover">
 <span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">concover</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arr1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arr2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#concover"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.concover" title="Link to this definition"></a></dt>
 <dd><p>Compare two distributions using a rank-based variance (Conover-like) test.</p>
@@ -1135,7 +1160,7 @@ descriptive and inferential statistics. Results are emitted via the
 
 <dl class="py function">
 <dt class="sig sig-object py" id="main.out_criteria">
-<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">out_criteria</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mz</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intensity</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">int_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_diff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width_eps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#out_criteria"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.out_criteria" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">out_criteria</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mz</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intensity</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">int_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_diff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width_eps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#out_criteria"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.out_criteria" title="Link to this definition"></a></dt>
 <dd><p>Identify outlier peak intervals based on intensity and width heuristics.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1184,6 +1209,28 @@ no samples above the threshold.</p></li>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="main.pool_initializer">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">pool_initializer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_raw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_aln</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx_tuple</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dev</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#pool_initializer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.pool_initializer" title="Link to this definition"></a></dt>
+<dd><p>Pool initializer: store global references to datasets, indices, and params.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data_raw</strong> (<em>ndarray</em>) – Raw dataset array loaded from HDF5.</p></li>
+<li><p><strong>data_aln</strong> (<em>ndarray</em>) – Aligned dataset array loaded from HDF5.</p></li>
+<li><p><strong>idx_tuple</strong> (<em>tuple</em><em>[</em><em>int</em><em>, </em><em>int</em><em>, </em><em>int</em><em>, </em><em>int</em><em>, </em><em>int</em><em>, </em><em>int</em><em>]</em>) – <code class="docutils literal notranslate"><span class="pre">(mz_idx_raw,</span> <span class="pre">intensity_idx_raw,</span> <span class="pre">spectra_idx_raw,</span> <span class="pre">mz_idx_aln,</span>
+<span class="pre">intensity_idx_aln,</span> <span class="pre">spectra_idx_aln)</span></code> indices into the datasets.</p></li>
+<li><p><strong>ref</strong> (<em>float</em>) – Reference m/z value for <code class="docutils literal notranslate"><span class="pre">find_ref</span></code>.</p></li>
+<li><p><strong>dev</strong> (<em>float</em>) – Allowed deviation (±) around <code class="docutils literal notranslate"><span class="pre">ref</span></code> for reference search.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Stores the arguments into module-level globals (<code class="docutils literal notranslate"><span class="pre">_DATA_RAW</span></code>, <code class="docutils literal notranslate"><span class="pre">_DATA_ALN</span></code>,
+<code class="docutils literal notranslate"><span class="pre">_IDX</span></code>, <code class="docutils literal notranslate"><span class="pre">_REF_DEV</span></code>) to avoid repeated pickling and argument passing to
+worker processes.</p>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="main.prepare_array">
 <span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">prepare_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">distances</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#prepare_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.prepare_array" title="Link to this definition"></a></dt>
 <dd><p>Concatenate per-peak distances and build a 2-row sorted view with indices.</p>
@@ -1201,32 +1248,123 @@ no samples above the threshold.</p></li>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="main.read_dataset">
-<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">read_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_raw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attrs_raw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_aln</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attrs_aln</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">REF</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DEV</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#read_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.read_dataset" title="Link to this definition"></a></dt>
-<dd><p>Prepare per-spectrum datasets and emit progress for the UI.</p>
-<p>This function extracts m/z and intensity columns, sorts by m/z, verifies
-alignment of raw vs. aligned spectra, finds reference peaks, and collects
-them into a pair of arrays suitable for downstream processing.</p>
+<dt class="sig sig-object py" id="main.process_spectrum">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">process_spectrum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#process_spectrum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.process_spectrum" title="Link to this definition"></a></dt>
+<dd><p>Process a single spectrum task and return datasets for raw and aligned.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>self</strong> (<a class="reference internal" href="#main.WorkerSignals" title="main.WorkerSignals"><em>WorkerSignals</em></a>) – Object used to emit progress-related signals.</p></li>
-<li><p><strong>dataset_raw</strong> (<em>ndarray</em>) – Raw and aligned datasets read from HDF5.</p></li>
-<li><p><strong>dataset_aln</strong> (<em>ndarray</em>) – Raw and aligned datasets read from HDF5.</p></li>
-<li><p><strong>attrs_raw</strong> (<em>list</em>) – Column headers for the respective datasets.</p></li>
-<li><p><strong>attrs_aln</strong> (<em>list</em>) – Column headers for the respective datasets.</p></li>
-<li><p><strong>REF</strong> (<em>float</em>) – Reference m/z seed.</p></li>
-<li><p><strong>DEV</strong> (<em>float</em>) – Acceptable deviation around <cite>REF</cite>.</p></li>
-<li><p><strong>limit</strong> (<em>int</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Optional limit on the number of spectra to process (debugging).</p></li>
-</ul>
+<dd class="field-odd"><p><strong>task</strong> (<em>tuple</em><em>[</em><em>int</em><em>, </em><em>int</em><em>, </em><em>int</em><em>, </em><em>int</em><em>, </em><em>int</em><em>]</em>) – <code class="docutils literal notranslate"><span class="pre">(spec_id,</span> <span class="pre">r0,</span> <span class="pre">r1,</span> <span class="pre">a0,</span> <span class="pre">a1)</span></code> where <code class="docutils literal notranslate"><span class="pre">[r0:r1]</span></code> and <code class="docutils literal notranslate"><span class="pre">[a0:a1]</span></code> are
+inclusive slices for raw and aligned blocks belonging to <code class="docutils literal notranslate"><span class="pre">spec_id</span></code>.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>2 x N object array of Dataset-like sequences (raw, aligned) by spectrum index.</p>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">(spec_id,</span> <span class="pre">arr_raw,</span> <span class="pre">arr_aln)</span></code> where <code class="docutils literal notranslate"><span class="pre">arr_raw</span></code> and <code class="docutils literal notranslate"><span class="pre">arr_aln</span></code> are
+NumPy arrays representing <code class="docutils literal notranslate"><span class="pre">Dataset</span></code> instances for the spectrum.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>ndarray</p>
+<dd class="field-odd"><p>tuple</p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.read_dataset">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">read_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_raw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attrs_raw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_aln</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attrs_aln</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">REF</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DEV</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">processes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#read_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.read_dataset" title="Link to this definition"></a></dt>
+<dd><p>Prepare per-spectrum datasets and emit progress for the UI, with optional
+sequential or parallel execution (multiprocessing.Pool).</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Resolve indices of required columns by headers (m/z and intensity).</p></li>
+<li><p>Build contiguous segments for each spectrum id based on the spectra index.</p></li>
+<li><p>Create tasks only for spectrum ids present in both raw and aligned inputs.</p></li>
+<li><p>For each task: slice the subarrays, sort by m/z, verify alignment
+(<code class="docutils literal notranslate"><span class="pre">verify_datasets</span></code>), find a reference peak around <code class="docutils literal notranslate"><span class="pre">REF</span></code> within <code class="docutils literal notranslate"><span class="pre">DEV</span></code>
+(<code class="docutils literal notranslate"><span class="pre">find_ref</span></code>), and store the result as a <code class="docutils literal notranslate"><span class="pre">Dataset</span></code> with a <code class="docutils literal notranslate"><span class="pre">reference</span></code>.</p></li>
+<li><p>Emit progress after each spectrum is processed.</p></li>
+</ul>
+</section>
+<section id="modes">
+<h2>Modes<a class="headerlink" href="#modes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Sequential (<code class="docutils literal notranslate"><span class="pre">processes</span> <span class="pre">&lt;=</span> <span class="pre">0</span></code>): runs in the main thread, preserving
+existing variable names and logic.</p></li>
+<li><p>Parallel (<code class="docutils literal notranslate"><span class="pre">processes</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>): uses <code class="docutils literal notranslate"><span class="pre">multiprocessing.Pool</span></code> with an
+initializer (<code class="docutils literal notranslate"><span class="pre">pool_initializer</span></code>) and worker (<code class="docutils literal notranslate"><span class="pre">process_spectrum</span></code>).
+Tasks are processed in parallel; results may arrive unordered and are
+placed by <code class="docutils literal notranslate"><span class="pre">spec_id</span></code>.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">param self<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Object used to emit progress bar initialization and updates.</p>
+</dd>
+<dt class="field-even">type self<span class="colon">:</span></dt>
+<dd class="field-even"><p>WorkerSignals</p>
+</dd>
+<dt class="field-odd">param dataset_raw<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Raw and aligned datasets read from HDF5.</p>
+</dd>
+<dt class="field-even">type dataset_raw<span class="colon">:</span></dt>
+<dd class="field-even"><p>ndarray</p>
+</dd>
+<dt class="field-odd">param dataset_aln<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Raw and aligned datasets read from HDF5.</p>
+</dd>
+<dt class="field-even">type dataset_aln<span class="colon">:</span></dt>
+<dd class="field-even"><p>ndarray</p>
+</dd>
+<dt class="field-odd">param attrs_raw<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Column headers for the respective datasets.</p>
+</dd>
+<dt class="field-even">type attrs_raw<span class="colon">:</span></dt>
+<dd class="field-even"><p>list of str</p>
+</dd>
+<dt class="field-odd">param attrs_aln<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Column headers for the respective datasets.</p>
+</dd>
+<dt class="field-even">type attrs_aln<span class="colon">:</span></dt>
+<dd class="field-even"><p>list of str</p>
+</dd>
+<dt class="field-odd">param REF<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Reference m/z seed.</p>
+</dd>
+<dt class="field-even">type REF<span class="colon">:</span></dt>
+<dd class="field-even"><p>float</p>
+</dd>
+<dt class="field-odd">param DEV<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Acceptable deviation (±) around <code class="docutils literal notranslate"><span class="pre">REF</span></code> for reference search.</p>
+</dd>
+<dt class="field-even">type DEV<span class="colon">:</span></dt>
+<dd class="field-even"><p>float</p>
+</dd>
+<dt class="field-odd">param limit<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional limit on the number of spectra to process (debugging).</p>
+</dd>
+<dt class="field-even">type limit<span class="colon">:</span></dt>
+<dd class="field-even"><p>int or None, optional</p>
+</dd>
+<dt class="field-odd">param processes<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Number of processes for <code class="docutils literal notranslate"><span class="pre">multiprocessing.Pool</span></code>. <code class="docutils literal notranslate"><span class="pre">&lt;=</span> <span class="pre">0</span></code> means
+sequential mode. Default is 0.</p>
+</dd>
+<dt class="field-even">type processes<span class="colon">:</span></dt>
+<dd class="field-even"><p>int, optional</p>
+</dd>
+<dt class="field-odd">returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Array of shape <code class="docutils literal notranslate"><span class="pre">(2,</span> <span class="pre">N)</span></code> with <code class="docutils literal notranslate"><span class="pre">dtype=Dataset</span></code>, where <code class="docutils literal notranslate"><span class="pre">N</span></code> is the
+number of processed spectra. <code class="docutils literal notranslate"><span class="pre">dataset_list[0,</span> <span class="pre">spec_id]</span></code> corresponds to
+the raw dataset; <code class="docutils literal notranslate"><span class="pre">dataset_list[1,</span> <span class="pre">spec_id]</span></code> to the aligned dataset.</p>
+</dd>
+<dt class="field-even">rtype<span class="colon">:</span></dt>
+<dd class="field-even"><p>ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Only spectrum ids present in both raw and aligned datasets are processed.</p></li>
+<li><p>The progress bar is initialized based on the number of tasks (common ids).</p></li>
+<li><p>In parallel mode, result arrival order is not guaranteed.</p></li>
+</ul>
+</section>
 </dd></dl>
 
 <dl class="py function">

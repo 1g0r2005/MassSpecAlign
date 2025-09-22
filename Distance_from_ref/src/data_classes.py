@@ -142,3 +142,27 @@ class LinkedList(np.ndarray):
             new_linked_array = np.reshape(self.linked_array, size)
             return LinkedList(new_self, new_linked_array)
         return new_self
+
+    def sync_split(self,indices_or_sections,axis=0):
+        """
+        Split both the array and the linked array into multiple sub-arrays.
+
+        Parameters
+        ----------
+        indices_or_sections : int or 1-D array_like
+            If an integer, it indicates the number of equal splits to make.
+            If an array, it indicates the indices at which to split.
+        axis : int, optional
+            Axis along which to split. Default is 0.
+
+        Returns
+        -------
+        list of LinkedList or ndarray
+            A list of `LinkedList` objects if a `linked_array` exists;
+            otherwise, a list of regular ndarray arrays.
+        """
+        split_self = np.array_split(self, indices_or_sections, axis=axis)
+        if self.linked_array is not None:
+            split_linked = np.array_split(self.linked_array, indices_or_sections, axis=axis)
+            return [LinkedList(s, l) for s, l in zip(split_self, split_linked)]
+        return split_self
