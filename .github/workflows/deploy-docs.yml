@@ -29,7 +29,7 @@ jobs:
         run: |
           echo "Installing Sphinx and dependencies..."
           pip install sphinx sphinx-rtd-theme
-          pip install numba diptest pyqt5 KDEpy ipython pyyaml scipy pyqtgraph numpy h5py
+          pip install numba diptest pyqt5 KDEpy ipython pyyaml scipy pyqtgraph numpy h5py pandas
 
       - name: Build documentation
         run: |
