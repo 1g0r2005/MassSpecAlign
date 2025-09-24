@@ -1,5 +1,8 @@
 import os
 
+import numpy as np
+import pandas
+
 os.environ['PYQTGRAPH_QT_LIB'] = 'PyQt5'
 
 import copy
@@ -23,8 +26,7 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabe
     QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter, \
     QHBoxLayout, QTreeWidget, QTreeWidgetItem, QProgressBar
 from diptest import diptest
-from numba import jit
-
+from numba import njit
 import alignment
 from data_classes import *
 
@@ -92,7 +94,7 @@ class WorkerSignals(QObject):
         Run the main data processing pipeline.
 
         The pipeline reads raw and aligned spectra from HDF5, computes KDEs,
-        performs peak picking, applies criteria, aligns peak lists, and computes
+        performs peak picking, aligns peak lists, and computes
         descriptive and inferential statistics. Results are emitted via the
         `result` signal as a tuple of render instructions and statistics.
 
@@ -113,7 +115,7 @@ class WorkerSignals(QObject):
 
             # включаем параллельную обработку по умолчанию (все ядра минус одно)
             processes = max(1, min((os.cpu_count() or 2) - 1,3))
-            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV, processes=processes)
+            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV, processes=processes,limit = 1000)
 
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -130,16 +132,19 @@ class WorkerSignals(QObject):
 
             borders_r = np.stack((left_r, right_r), axis=1)
             borders_a = np.stack((left_a, right_a), axis=1)
-            ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
-            ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
+            c_ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
+            c_ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
 
-            c_ds_raw,c_ds_aln = criteria_apply(ds_raw, max_center_r),criteria_apply(ds_aln, max_center_a)
+
             c_ds_raw_intensity, c_ds_aln_intensity = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,
                                                                                                     kde_y_aln)
+
 
             peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
             peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
+            print(raw_concat)
+            print(peak_lists_raw)
             aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = alignment.munkres(peak_lists_raw,
                                                                                                  peak_lists_aln,
                                                                                                  c_ds_raw,
@@ -1589,11 +1594,66 @@ def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
                 pk_x[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
     return pk_x, X[left_min], X[right_min]
 
-
-@jit(nopython=True)
-def sort_dots(ds: np.ndarray, left: np.ndarray, right: np.ndarray) -> list:
+@njit()
+def sort_dots_numba(ds: np.ndarray, left: np.ndarray, right: np.ndarray) -> list:
     """
     Group values into bins defined by paired left/right boundaries.
+
+    Parameters
+    ----------
+    ds : ndarray
+        Values to be grouped.
+    left : ndarray
+        Left boundaries for each bin.
+    right : ndarray
+        Right boundaries for each bin.
+
+    Returns
+    -------
+    flat_grouped_values : ndarray
+        Concatenated values from all bins.
+    split_indices : ndarray
+        Indices to split `flat_grouped_values` into original bins.
+    """
+
+    num_intervals = left.size
+    num_ds = ds.size
+
+    # 1. Сначала подсчитываем, сколько элементов попадает в каждый интервал
+    counts = np.zeros(num_intervals, dtype=np.int64)
+    for i in range(num_intervals):
+        # np.sum() на булевом массиве работает в nopython режиме
+        counts[i] = np.sum((ds >= left[i]) & (ds <= right[i]))
+
+    # 2. Вычисляем индексы для разделения. Это будет [0, count_0, count_0+count_1, ...]
+    split_indices = np.zeros(num_intervals + 1, dtype=np.int64)
+    split_indices[1:] = np.cumsum(counts)
+
+    # 3. Создаем плоский массив для всех найденных значений
+    total_elements = split_indices[-1]
+    flat_grouped_values = np.empty(total_elements, dtype=ds.dtype)
+
+    # Создаем копию индексов, чтобы отслеживать, куда вставлять следующий элемент для каждого интервала
+    current_indices = split_indices.copy()
+
+    for i in range(num_ds):
+        val = ds[i]
+        for j in range(num_intervals):
+            if left[j] <= val <= right[j]:
+                # Находим позицию для вставки и вставляем значение
+                idx_to_insert = current_indices[j]
+                flat_grouped_values[idx_to_insert] = val
+                # Увеличиваем индекс для следующего элемента в этом интервале
+                current_indices[j] += 1
+                # Поскольку интервалы не пересекаются, можно прервать внутренний цикл
+                break
+
+    return flat_grouped_values, split_indices
+
+
+def sort_dots(ds: np.ndarray, left: np.ndarray, right: np.ndarray) -> list:
+    """
+    Wrapper above sort_dots_numba to return grouped values as a list.
 
     Parameters
     ----------
@@ -1609,8 +1669,13 @@ def sort_dots(ds: np.ndarray, left: np.ndarray, right: np.ndarray) -> list:
     list of ndarray
         For each interval [left[i], right[i]], the subset of `ds` within it.
     """
-    mask = (ds[:, None] >= left) & (ds[:, None] <= right)
-    return [ds[m] for m in mask.T]
+    if len(left) == 0:
+        return []
+
+    flat_values, split_ind = sort_dots_numba(ds, left, right)
+
+    ret = np.split(flat_values, split_ind[1:-1])
+    return ret
 
 
 def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray) -> (np.ndarray, np.ndarray, bool):
@@ -2156,6 +2221,9 @@ def moving_average(a, n=2):
 
 def out_criteria(mz, intensity, int_threshold = 0.01, max_diff = 0.4, width_eps = 0.1):
     """
+    .. warning::
+        Current version of pipeline doesn't use this function
+
     Identify outlier peak intervals based on intensity and width heuristics.
 
     Parameters
@@ -2189,6 +2257,9 @@ def out_criteria(mz, intensity, int_threshold = 0.01, max_diff = 0.4, width_eps 
 
 def criteria_apply(arr, intensity):
     """
+    .. warning::
+        Current version of pipeline doesn't use this function
+
     Merge narrow neighboring intervals and drop flagged indices.
 
     Parameters
