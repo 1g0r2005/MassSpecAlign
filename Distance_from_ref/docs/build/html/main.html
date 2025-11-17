@@ -79,6 +79,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#main.GraphPage.pyqt_settings"><code class="docutils literal notranslate"><span class="pre">GraphPage.pyqt_settings()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="#main.HMP"><code class="docutils literal notranslate"><span class="pre">HMP()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.LogWidget"><code class="docutils literal notranslate"><span class="pre">LogWidget</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#main.LogWidget.updateText"><code class="docutils literal notranslate"><span class="pre">LogWidget.updateText()</span></code></a></li>
 </ul>
@@ -88,6 +89,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#main.MainPage.Pbar_set_ranges"><code class="docutils literal notranslate"><span class="pre">MainPage.Pbar_set_ranges()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#main.MainPage.open_config"><code class="docutils literal notranslate"><span class="pre">MainPage.open_config()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#main.MainPage.open_file"><code class="docutils literal notranslate"><span class="pre">MainPage.open_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#main.MainPage.result"><code class="docutils literal notranslate"><span class="pre">MainPage.result()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#main.MainPage.signal"><code class="docutils literal notranslate"><span class="pre">MainPage.signal()</span></code></a></li>
 </ul>
 </li>
@@ -136,6 +138,7 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#main.build_segments"><code class="docutils literal notranslate"><span class="pre">build_segments()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.concover"><code class="docutils literal notranslate"><span class="pre">concover()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.construct_output"><code class="docutils literal notranslate"><span class="pre">construct_output()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.criteria_apply"><code class="docutils literal notranslate"><span class="pre">criteria_apply()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.find_ref"><code class="docutils literal notranslate"><span class="pre">find_ref()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.get_long_and_short"><code class="docutils literal notranslate"><span class="pre">get_long_and_short()</span></code></a></li>
@@ -190,6 +193,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#main.GraphPage.pyqt_settings"><code class="docutils literal notranslate"><span class="pre">GraphPage.pyqt_settings()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#main.HMP"><code class="docutils literal notranslate"><span class="pre">HMP()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.LogWidget"><code class="docutils literal notranslate"><span class="pre">LogWidget</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#main.LogWidget.updateText"><code class="docutils literal notranslate"><span class="pre">LogWidget.updateText()</span></code></a></li>
 </ul>
@@ -199,6 +203,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#main.MainPage.Pbar_set_ranges"><code class="docutils literal notranslate"><span class="pre">MainPage.Pbar_set_ranges()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.MainPage.open_config"><code class="docutils literal notranslate"><span class="pre">MainPage.open_config()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.MainPage.open_file"><code class="docutils literal notranslate"><span class="pre">MainPage.open_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#main.MainPage.result"><code class="docutils literal notranslate"><span class="pre">MainPage.result()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#main.MainPage.signal"><code class="docutils literal notranslate"><span class="pre">MainPage.signal()</span></code></a></li>
 </ul>
 </li>
@@ -247,6 +252,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#main.build_segments"><code class="docutils literal notranslate"><span class="pre">build_segments()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.concover"><code class="docutils literal notranslate"><span class="pre">concover()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main.construct_output"><code class="docutils literal notranslate"><span class="pre">construct_output()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.criteria_apply"><code class="docutils literal notranslate"><span class="pre">criteria_apply()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.find_ref"><code class="docutils literal notranslate"><span class="pre">find_ref()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#main.get_long_and_short"><code class="docutils literal notranslate"><span class="pre">get_long_and_short()</span></code></a></li>
@@ -492,7 +498,7 @@
 
 <dl class="py class">
 <dt class="sig sig-object py" id="main.GraphPage">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">GraphPage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canvas_count</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'PlotPage'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title_plots</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(255,</span> <span class="pre">255,</span> <span class="pre">255)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bg_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_colors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autoSize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#GraphPage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.GraphPage" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">GraphPage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canvas_count</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'PlotPage'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title_plots</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(255,</span> <span class="pre">255,</span> <span class="pre">255)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bg_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(240,</span> <span class="pre">240,</span> <span class="pre">230)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_colors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autoSize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#GraphPage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.GraphPage" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">QWidget</span></code></p>
 <p>Page with one or more plotting canvases built on pyqtgraph.</p>
 <dl class="field-list simple">
@@ -584,6 +590,28 @@
 
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="main.HMP">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">HMP</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">w</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-10</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#HMP"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.HMP" title="Link to this definition"></a></dt>
+<dd><p>Calculate harmonic mean p-value with given weights</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>p_value</strong> (<em>ndarray</em>) – p-value array</p></li>
+<li><p><strong>w</strong> (<em>ndarray</em><em>|</em><em>None</em>) – weights array, equal size with p_value; if not given w = 1/len(p_value) will be used.</p></li>
+<li><p><strong>alpha</strong> (<em>float</em>) – Confidence level. Default is 0.05</p></li>
+<li><p><strong>epsilon</strong> (<em>float</em>) – Small value added to p-value to avoid division by zero</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>HMP value</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py class">
 <dt class="sig sig-object py" id="main.LogWidget">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">LogWidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#LogWidget"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.LogWidget" title="Link to this definition"></a></dt>
@@ -650,6 +678,17 @@
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>raw_filename</strong> (<em>QLineEdit</em>) – Line edit to receive the selected file path.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="main.MainPage.result">
+<span class="sig-name descname"><span class="pre">result</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#MainPage.result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.MainPage.result" title="Link to this definition"></a></dt>
+<dd><p>Show final result</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>result</strong> (<em>tuple</em>) – (string which will be displayed in final_result QLabel, type of result (for text color))</p>
 </dd>
 </dl>
 </dd></dl>
@@ -791,7 +830,7 @@
 
 <dl class="py class">
 <dt class="sig sig-object py" id="main.StatGraphPage">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">StatGraphPage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'StatPage'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(255,</span> <span class="pre">255,</span> <span class="pre">255)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bg_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_val</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#StatGraphPage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.StatGraphPage" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">StatGraphPage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'StatPage'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(255,</span> <span class="pre">255,</span> <span class="pre">255)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bg_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(240,</span> <span class="pre">240,</span> <span class="pre">230)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_val</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#StatGraphPage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.StatGraphPage" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#main.GraphPage" title="main.GraphPage"><code class="xref py py-class docutils literal notranslate"><span class="pre">GraphPage</span></code></a></p>
 <p>Page for visualizing summary statistics distributions across datasets.</p>
 <p>Plots include standard deviation, dip test statistic/p-value, skewness,
@@ -1051,6 +1090,29 @@ from an HDF5 dataset.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="main.construct_output">
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">construct_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_raw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_aln</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#construct_output"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.construct_output" title="Link to this definition"></a></dt>
+<dd><p>Detect peaks in a KDE curve and return their centers and boundaries.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>p_value</strong> (<em>np.ndarray</em>) – Array with all p-values</p></li>
+<li><p><strong>var_raw</strong> (<em>np.ndarray</em>) – Array with dispersion for all peaks in raw data</p></li>
+<li><p><strong>var_aln</strong> (<em>np.ndarray</em>) – Array with dispersion for all peaks in aln data</p></li>
+<li><p><strong>alpha</strong> (<em>float</em>) – Confidence level. Default is 0.05.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>result_type</strong> (<em>float</em>) – type of result: -1 is negative, +1 is positive, 0 is not statistically significant.</p></li>
+<li><p><strong>result_text</strong> (<em>str</em>) – exact text of result message which will be displayed.</p></li>
+</ul>
+</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1422,20 +1484,20 @@ the raw dataset; <code class="docutils literal notranslate"><span class="pre">da
 
 <dl class="py function">
 <dt class="sig sig-object py" id="main.stat_params_paired_single">
-<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">stat_params_paired_single</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">peak_raw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">peak_aln</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#stat_params_paired_single"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.stat_params_paired_single" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">main.</span></span><span class="sig-name descname"><span class="pre">stat_params_paired_single</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">peak_raw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">peak_aln</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/main.html#stat_params_paired_single"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#main.stat_params_paired_single" title="Link to this definition"></a></dt>
 <dd><p>Compute paired statistics between raw and aligned peak positions.</p>
-<p>For each matched peak, compute mean difference, variances, normality check,
-and hypothesis tests for means and variances.</p>
+<p>For each matched peak, compute mean difference, variances, normality check (to choose acceptable hypothesis tests) and JS-divergence</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>peak_raw</strong> (<em>array_like</em>) – Samples of raw and aligned values for a single peak.</p></li>
 <li><p><strong>peak_aln</strong> (<em>array_like</em>) – Samples of raw and aligned values for a single peak.</p></li>
-<li><p><strong>p_value</strong> (<em>float</em><em>, </em><em>optional</em>) – Significance level used in tests. Default is 0.05.</p></li>
+<li><p><strong>alpha</strong> (<em>float</em><em>, </em><em>optional</em>) – Significance level used in tests. Default is 0.05.</p></li>
+<li><p><strong>return_p</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, function will return exact p-value, otherwise result of comparison with significance level. Default is True.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">(mean_diff,</span> <span class="pre">var_raw,</span> <span class="pre">var_aln,</span> <span class="pre">is_normal,</span> <span class="pre">neq_mean,</span> <span class="pre">neq_var)</span></code>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">(mean_diff,</span> <span class="pre">var_raw,</span> <span class="pre">var_aln,</span> <span class="pre">js_div,</span> <span class="pre">neq_mean,</span> <span class="pre">neq_var)</span></code>
 where boolean flags are returned as floats (0.0/1.0).</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
