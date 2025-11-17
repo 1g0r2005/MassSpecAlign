@@ -1,7 +1,7 @@
+import multiprocessing
 import os
 
 import numpy as np
-import pandas
 
 os.environ['PYQTGRAPH_QT_LIB'] = 'PyQt5'
 
@@ -17,7 +17,7 @@ import h5py
 import pyqtgraph as pg
 import scipy.stats as stats
 import yaml
-from IPython.external.qt_for_kernel import QtCore
+from PyQt5 import QtCore
 from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal, Qt, QThread
@@ -29,7 +29,7 @@ from diptest import diptest
 from numba import njit
 import alignment
 from data_classes import *
-
+from scipy.special import rel_entr
 """classes declaration"""
 
 
@@ -115,7 +115,8 @@ class WorkerSignals(QObject):
 
             # включаем параллельную обработку по умолчанию (все ядра минус одно)
             processes = max(1, min((os.cpu_count() or 2) - 1,3))
-            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV, processes=processes,limit = 1000)
+            processes=2
+            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV, processes=processes)
 
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -157,6 +158,11 @@ class WorkerSignals(QObject):
                 [stat_params_paired_single(x_el, y_el) for x_el, y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],
                 dtype='object')
 
+            result_text,result_type = construct_output(p_value=s_p[:,-1],
+                                                       var_raw=s_p[:,1],
+                                                       var_aln=s_p[:,2])
+
+
             ret = (
                 ('show', (((kde_x_raw, kde_y_raw), 'raw', 'red', 'p', 'kde'),
                         ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
@@ -170,9 +176,10 @@ class WorkerSignals(QObject):
                  ((stat_params_unpaired(peak_lists_raw).T, 'raw'), (stat_params_unpaired(peak_lists_aln).T, 'aln'))),
                 ('stats_p', ((stat_params_unpaired(aln_peak_lists_raw).T, 'raw'),
                              (stat_params_unpaired(aln_peak_lists_aln).T, 'aln'))),
-                ('stats_table',s_p)
+                ('stats_table',s_p),
+                ('final',(result_text,result_type))
             )
-
+            print(s_p.shape)
             self.result.emit(ret)
             self.finished.emit()
 
@@ -753,7 +760,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.table, self.table.title)
 
 
-        self.table.set_title(['distance','var(raw)','var(aln)','is normal distributed?','neq_mean?','neq_var?'])
+        self.table.set_title(['Distance','Var(raw)','Var(aln)','JSD','neq_mean?','neq_var?'])
         self.signals = WorkerSignals()
         self.manager = ProcessManager(self.signals)
 
@@ -776,7 +783,7 @@ class MainWindow(QMainWindow):
         ret : Sequence[tuple]
             Iterable of (key, payload) pairs where key selects a handler.
         """
-        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stats.add_plot_mul, 'stats_p': self.stats_p.add_plot_mul,'stats_table':self.table.add_data}
+        self.aval_func = {'show': self.graph.add_plot_mul, 'stats': self.stats.add_plot_mul, 'stats_p': self.stats_p.add_plot_mul,'stats_table':self.table.add_data,'final':self.main.result}
         for output in ret:
             self.aval_func[output[0]](output[1])
 
@@ -922,6 +929,8 @@ class MainPage(QWidget):
         self.bw_set = QLineEdit()
         self.n_dots_set = QLineEdit()
 
+        self.global_result = QLabel()
+
         form_layout.addRow(QLabel("Raw data:"), self.raw_layout)
         form_layout.addRow(QLabel("Alignment data:"), self.aln_layout)
         form_layout.addRow(QLabel("Dataset (raw):"), self.dataset_raw)
@@ -958,6 +967,9 @@ class MainPage(QWidget):
         self.aln_tree.path_signal.connect(lambda path: self.dataset_aln.setText(path))
 
         self.right_layout.addWidget(self.pbar_widget)
+        #temp: result out
+        self.right_layout.addWidget(self.global_result)
+        self.global_result.hide()
         self.pbar_widget.hide()
 
         try:
@@ -1102,6 +1114,35 @@ class MainPage(QWidget):
             lambda: self.pbar.hide()
         )
 
+    def result(self, result):
+        """
+        Show final result
+
+        Parameters
+        ----------
+        result : tuple
+            (string which will be displayed in final_result QLabel, type of result (for text color))
+        """
+        result_text,result_type = result
+
+        match result_type:
+            case 0:
+                color_name = 'black'
+            case -1:
+                color_name = 'red'
+            case 1:
+                color_name = 'green'
+
+        self.global_result.setStyleSheet("""
+        QLabel {
+        color: %s};
+        font-size: 16px;
+        padding: 10px;
+        }
+        """%color_name)
+        self.global_result.setText(result_text)
+        self.global_result.show()
+
 
 class TablePage(QWidget):
     """
@@ -1221,7 +1262,7 @@ class GraphPage(QWidget):
         Whether to enable auto-ranging on the Y axis.
     """
     def __init__(self, parent, canvas_count=1, title='PlotPage', title_plots=None, x_labels=None, y_labels=None,
-                 color=(255, 255, 255), bg_color=(0, 0, 0),n_colors = 8,autoSize = True):
+                 color=(255, 255, 255), bg_color=(240, 240, 230),n_colors = 8,autoSize = True):
         super().__init__()
         self.autoSize = autoSize
         self.bg_color = bg_color
@@ -1264,7 +1305,8 @@ class GraphPage(QWidget):
         plot_widget : pg.PlotWidget
             Target plot widget.
         """
-        plot_widget.addLegend(brush='black')
+        plot_widget.setBackground(self.bg_color)
+        plot_widget.addLegend(brush=self.bg_color)
         plot_widget.setMouseEnabled(y=False, x=True)
 
         vb = plot_widget.getViewBox()
@@ -1425,8 +1467,8 @@ class StatGraphPage(GraphPage):
     and kurtosis histograms for raw and aligned data.
     """
     def __init__(self, parent, title='StatPage', x_labels=None, y_labels=None,
-                 color=(255, 255, 255), bg_color=(0, 0, 0), p_val=0.05):
-        super().__init__(parent, canvas_count=4, title=title, title_plots=('std_dev', 'modality (dip test)', 'skewness', 'kurtosis'),
+                 color=(255, 255, 255), bg_color=(240, 240, 230), p_val=0.05):
+        super().__init__(parent, canvas_count=4, title=title, title_plots=('std_dev', 'modality (dip test) p-value', 'skewness', 'kurtosis'),
                          x_labels=x_labels, y_labels=y_labels, color=color, bg_color=bg_color,autoSize=False)
 
 
@@ -1478,7 +1520,8 @@ class StatGraphPage(GraphPage):
             #self.table_data[0, n] = len(data[0])
 
             self.add_plot(data[0], f'st dev {data_name}', ds_color, 'std_dev')
-            self.add_plot(data[1], f'dip {data_name}', ds_color, 'modality (dip test)')
+            self.add_plot(data[2], f'dip {data_name}', ds_color, 'modality (dip test) p-value')
+            self.add_line(data = 0.05,y_max=len(data[2]),canvas_name='modality (dip test) p-value',color='black')
             self.add_plot(data[3], f'skew {data_name}', ds_color, 'skewness')
             self.add_plot(data[4], f'kurt {data_name}', ds_color, 'kurtosis')
             #self.table_data[1, n] = np.where(data[2] < self.p)[0].size
@@ -1515,6 +1558,63 @@ class StatGraphPage(GraphPage):
 
 
 '''functions declaration'''
+def construct_output(p_value, var_raw, var_aln,alpha = 0.05):
+    """
+        Detect peaks in a KDE curve and return their centers and boundaries.
+
+        Parameters
+        ----------
+        p_value : np.ndarray
+            Array with all p-values
+        var_raw : np.ndarray
+            Array with dispersion for all peaks in raw data
+        var_aln : np.ndarray
+            Array with dispersion for all peaks in aln data
+        alpha: float
+            Confidence level. Default is 0.05.
+        Returns
+        -------
+        result_type: float
+            type of result: -1 is negative, +1 is positive, 0 is not statistically significant.
+        result_text: str
+            exact text of result message which will be displayed.
+        """
+    hmp, hmp_significance = HMP(p_value,alpha)
+    delta_var_all= np.mean(var_raw - var_aln)
+    delta_var_significant = np.mean((var_raw - var_aln)[np.where(p_value<=alpha)])
+
+    if hmp_significance: #if significant
+        if delta_var_significant>0:
+            result_type = 1
+            result_text = f"""
+                            <div style='font-family: Times New Roman, font-size=12px;'>
+                                <b>Alignment is better than raw data</b><br>
+                                HMP = <b>{hmp:.2e}</b><br>
+                                &Delta;&sigma;<sup>2</sup>(total) = <b>{delta_var_all:.2e}</b><br>
+                                &Delta;&sigma;<sup>2</sup>(sign.) = <b>{delta_var_significant:.2e}</b>
+                            </div>
+                        """
+        else:
+            result_type = -1
+            result_text = f"""
+                <div style='font-family: Times New Roman, font-size=12px;'>
+                    <b>Alignment is worse than raw data</b><br>
+                    HMP = <b>{hmp:.2e}</b><br>
+                    &Delta;&sigma;<sup>2</sup>(total) = <b>{delta_var_all:.2e}</b><br>
+                    &Delta;&sigma;<sup>2</sup>(sign.) = <b>{delta_var_significant:.2e}</b>
+                </div>
+            """
+    else:
+        result_type = 0
+        result_text = f"""
+            <div style='font-family: Times New Roman, font-size=12px;'>
+                <b>The differences are not significant</b><br>
+                HMP = <b>{hmp:.2e}</b><br>
+                &Delta;&sigma;<sup>2</sup>(total) = <b>{delta_var_all:.2e}</b><br>
+                &Delta;&sigma;<sup>2</sup>(sign.) = <b>{delta_var_significant:.2e}</b>
+            </div>
+        """
+    return result_text, result_type
 
 
 def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
@@ -2044,6 +2144,7 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
         REF, DEV,
     )
 
+    multiprocessing.util.FINALIZE_MAX_DELAY = 10
     with Pool(processes=processes, initializer=pool_initializer, initargs=init_args) as pool:
         for spec_n, (spec_id, arr_raw, arr_aln) in enumerate(pool.imap_unordered(process_spectrum, tasks)):
             dataset_list[0, spec_id] = arr_raw
@@ -2101,6 +2202,33 @@ def prepare_array(distances):
     result = pre_sorted[:, pre_sorted[0].argsort()]
     return result
 
+def HMP(p_value,w = None,alpha = 0.05,epsilon = 1e-10):
+    """
+    Calculate harmonic mean p-value with given weights
+
+    Parameters
+    ----------
+    p_value : ndarray
+        p-value array
+    w : ndarray|None
+        weights array, equal size with p_value; if not given w = 1/len(p_value) will be used.
+    alpha : float
+        Confidence level. Default is 0.05
+    epsilon: float
+        Small value added to p-value to avoid division by zero
+    Returns
+    -------
+    float
+        HMP value
+    """
+
+    if w is None:
+        w = np.full_like(p_value, 1/p_value.size)
+
+    hmp = np.sum(w)/(np.sum(w/(p_value+epsilon)))
+    hmp_significance = hmp < alpha
+
+    return hmp, hmp_significance
 
 def concover(arr1:np.ndarray,arr2:np.ndarray):
     """
@@ -2141,42 +2269,51 @@ def concover(arr1:np.ndarray,arr2:np.ndarray):
     return p_value
 
 
-def stat_params_paired_single(peak_raw, peak_aln, p_value=0.05):
+def stat_params_paired_single(peak_raw, peak_aln, alpha=0.05,return_p = True):
     """
     Compute paired statistics between raw and aligned peak positions.
 
-    For each matched peak, compute mean difference, variances, normality check,
-    and hypothesis tests for means and variances.
+    For each matched peak, compute mean difference, variances, normality check (to choose acceptable hypothesis tests) and JS-divergence
 
     Parameters
     ----------
     peak_raw, peak_aln : array_like
         Samples of raw and aligned values for a single peak.
-    p_value : float, optional
+    alpha : float, optional
         Significance level used in tests. Default is 0.05.
+    return_p : bool, optional
+        If True, function will return exact p-value, otherwise result of comparison with significance level. Default is True.
 
     Returns
     -------
     tuple
-        ``(mean_diff, var_raw, var_aln, is_normal, neq_mean, neq_var)``
+        ``(mean_diff, var_raw, var_aln, js_div, neq_mean, neq_var)``
         where boolean flags are returned as floats (0.0/1.0).
     """
     # вычислить среднее и дисперсии, проверить нормальность, проверить гипотезы о значимости различия средних и дисперсий, возможно посчитать форму распределения
+    jsd = lambda p,q: 0.5*(sum(rel_entr(p,q))+sum(rel_entr(q,p)))
+    kde_single_peak = lambda dots,n_eval: FFTKDE(bw='silverman',kernel='gaussian').fit(dots).evaluate(n_eval)[1]
 
     norm_var = lambda data: np.var(data-np.mean(data),ddof=1)
     mean_r, mean_a = np.mean(peak_raw), np.mean(peak_aln)
     var_r, var_a = norm_var(peak_raw), norm_var(peak_aln)
 
     check_normal_func = lambda data,p: stats.kstest(data,'norm',args=(np.mean(data),np.std(data)))[1]>p
-    check_normal = check_normal_func(peak_raw,p_value) & check_normal_func(peak_aln,p_value)
+    check_normal = check_normal_func(peak_raw, alpha) & check_normal_func(peak_aln, alpha)
     if check_normal:
-        neq_var = stats.levene(peak_raw, peak_aln)[1] < p_value
-        neq_mean = stats.ttest_ind(peak_raw, peak_aln,nan_policy='omit')[1] < p_value
+        neq_var_p_val = stats.levene(peak_raw, peak_aln)[1]
+        neq_mean_p_val = stats.ttest_ind(peak_raw, peak_aln,nan_policy='omit')[1]
     else:
-        neq_mean = stats.mannwhitneyu(peak_raw, peak_aln)[1] < p_value
-        neq_var = stats.ansari(peak_raw, peak_aln)[1] < p_value
+        neq_mean_p_val = stats.mannwhitneyu(peak_raw, peak_aln)[1]
+        neq_var_p_val = stats.ansari(peak_raw, peak_aln)[1]
 
-    return mean_r - mean_a, var_r, var_a,float(check_normal), float(neq_mean), float(neq_var)
+    if return_p:
+        neq_var = neq_var_p_val
+        neq_mean = neq_mean_p_val
+    else:
+        neq_var = neq_var_p_val < alpha
+        neq_mean = neq_mean_p_val < alpha
+    return np.nan_to_num(np.array([mean_r - mean_a, var_r, var_a,jsd(kde_single_peak(peak_raw,20),kde_single_peak(peak_aln,20)), float(neq_mean), float(neq_var)]),nan=0)
 
 
 def stat_params_unpaired(ds):
@@ -2282,7 +2419,8 @@ def criteria_apply(arr, intensity):
 
 
 if __name__ == '__main__':
-
+    multiprocessing.freeze_support()
+    multiprocessing.set_start_method('spawn')
     app = QApplication(sys.argv)
     app_icon = QIcon('main_ico.png')
     app.setWindowIcon(app_icon)

@@ -1,9 +1,11 @@
 BW: 0.02
-DATASET_A: /roi1_e046/00/peaklists
-DATASET_R: /roi1_e046/00/peaklists
+DATASET_A: /roi2_e033/00/features
+DATASET_R: /roi2_e033/00/features
 DEV: 1.0
 FILE_NAMES: !!python/tuple
-- C:/Users/doomu/Downloads/Rapiflex_specdata_Raw.hdf5
-- C:/Users/doomu/Downloads/Rapiflex_specdata_Aligned.hdf5
+- "C:/Users/doomu/OneDrive/\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\
+  /Distribution/HDF/Data/E031_032_033_5mg_60C_90sec_9AA_161023_rawdata.hdf5"
+- "C:/Users/doomu/OneDrive/\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\
+  /Distribution/HDF/Data/E031_032_033_5mg_60C_90sec_9AA_161023.hdf5"
 NDOTS: 100000
 REF: 193.07712

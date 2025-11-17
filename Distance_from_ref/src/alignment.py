@@ -3,7 +3,7 @@ from scipy.optimize import linear_sum_assignment
 from data_classes import *
 
 
-def munkres(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=0.2,skip_level=0.9,segmentation_threshold = 300):
+def munkres(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=0.4,skip_level=0.8,segmentation_threshold = 300):
     """
     Chunked alignment wrapper over `munkres_align` to handle large inputs.
 
@@ -76,8 +76,6 @@ def munkres(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=0.2,sk
     for i in range(chunk_count):
         print(f'Processing chunk {i+1}/{chunk_count} with sizes {len(chunk_ags[0][i])} and {len(chunk_ags[1][i])}')
 
-        print(f'x_chunk: {chunk_ags[0][i]}')
-        print(f'y_chunk: {chunk_ags[1][i]}')
 
 
         if i == 0:
@@ -89,15 +87,10 @@ def munkres(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=0.2,sk
             aln_x_linked = np.concatenate([aln_x_linked, axl])
             aln_y_linked = np.concatenate([aln_y_linked, ayl])
 
-    print('Final alignment results:')
-    print(aln_x)
-    print(aln_y)
-    print(aln_x_linked)
-    print(aln_y_linked)
 
     return aln_x, aln_y, aln_x_linked, aln_y_linked
 
-def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=0.3,skip_level=0.5):
+def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=0.4,skip_level=0.8):
     """
     Align two sequences using the Hungarian (Munkres) algorithm with an
     intensity-aware distance cost and optional skipping.
@@ -145,8 +138,7 @@ def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=
 
     x_len,y_len = len(x),len(y)
     x_n,y_n = __equal_size(x,y)
-    print(f'xn({type(x_n)}): {x_n},{x_n.linked_array}')
-    print(f'yn({type(y_n)}): {y_n},{y_n.linked_array}')
+
     matrix = __make_matrix(x_n,y_n,skip_fraction,skip_level)
     #print(f'matrix shape {matrix.shape}')
     indexes = np.array(linear_sum_assignment(matrix))
@@ -199,11 +191,6 @@ def __w(x, y,alpha_dist=1,alpha_int=0.01, k = 20):
     x_linked = np.asarray(x.linked_array, dtype=float)
     y_linked = np.asarray(y.linked_array, dtype=float)
 
-    # Диагностика dtypes до вычислений
-    print('x_arr dtype:', getattr(x_arr, 'dtype', None), 'shape:', getattr(x_arr, 'shape', None))
-    print('y_arr dtype:', getattr(y_arr, 'dtype', None), 'shape:', getattr(y_arr, 'shape', None))
-    print('x_linked dtype:', getattr(x_linked, 'dtype', None), 'shape:', getattr(x_linked, 'shape', None))
-    print('y_linked dtype:', getattr(y_linked, 'dtype', None), 'shape:', getattr(y_linked, 'shape', None))
 
     scale = lambda var, alpha: np.exp(var * alpha) - 1
     norm = lambda var,k: np.tanh(var/k)
@@ -211,10 +198,7 @@ def __w(x, y,alpha_dist=1,alpha_int=0.01, k = 20):
     dist_scaled = scale(abs(x_arr-y_arr),alpha_dist)
     dint_scaled = scale(abs(x_linked-y_linked),alpha_int)
 
-    # Диагностика типов и значений
-    print('dist_scaled dtype:', getattr(dist_scaled, 'dtype', None), 'shape:', getattr(dist_scaled, 'shape', None))
-    print('dint_scaled dtype:', getattr(dint_scaled, 'dtype', None), 'shape:', getattr(dint_scaled, 'shape', None))
-
+    
     weight = (dist_scaled**2+dint_scaled**2)**0.5
 
     return norm(weight,k)
