@@ -45,6 +45,11 @@ class Const:
         HDF5 path to the aligned spectra dataset.
     REF : float or None
         Reference m/z value used to locate the reference peak.
+
+        .. warning::
+            This parameter is currently **not used** in the pipeline and will be removed
+            in a future version.
+
     DEV : float or None
         Acceptable deviation (±) around `REF` when searching for the reference peak.
     N_DOTS : int or None
