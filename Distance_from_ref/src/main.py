@@ -30,6 +30,7 @@ from numba import njit
 import alignment
 from data_classes import *
 from scipy.special import rel_entr
+import pandas as pd
 """classes declaration"""
 
 
@@ -120,7 +121,7 @@ class WorkerSignals(QObject):
 
             # включаем параллельную обработку по умолчанию (все ядра минус одно)
             processes = max(1, min((os.cpu_count() or 2) - 1,3))
-            processes=2
+
             distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV, processes=processes)
 
             distance_list_prepared = prepare_array(distance_list)
@@ -159,9 +160,9 @@ class WorkerSignals(QObject):
                                                                                                  c_ds_aln_intensity,
                                                                                                  segmentation_threshold=400)
 
-            s_p = np.array(
+            s_p = np.array(pd.DataFrame(np.array(
                 [stat_params_paired_single(x_el, y_el) for x_el, y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],
-                dtype='object')
+                dtype='float')).dropna())
 
             result_text,result_type = construct_output(p_value=s_p[:,-1],
                                                        var_raw=s_p[:,1],
@@ -1584,17 +1585,17 @@ def construct_output(p_value, var_raw, var_aln,alpha = 0.05):
         result_text: str
             exact text of result message which will be displayed.
         """
-    hmp, hmp_significance = HMP(p_value,alpha)
+    s_val, simes_significance = simes(p_value, alpha)
     delta_var_all= np.mean(var_raw - var_aln)
     delta_var_significant = np.mean((var_raw - var_aln)[np.where(p_value<=alpha)])
 
-    if hmp_significance: #if significant
+    if simes_significance: #if significant
         if delta_var_significant>0:
             result_type = 1
             result_text = f"""
                             <div style='font-family: Times New Roman, font-size=12px;'>
                                 <b>Alignment is better than raw data</b><br>
-                                HMP = <b>{hmp:.2e}</b><br>
+                                Simes = <b>{s_val:.2e}</b><br>
                                 &Delta;&sigma;<sup>2</sup>(total) = <b>{delta_var_all:.2e}</b><br>
                                 &Delta;&sigma;<sup>2</sup>(sign.) = <b>{delta_var_significant:.2e}</b>
                             </div>
@@ -1604,7 +1605,7 @@ def construct_output(p_value, var_raw, var_aln,alpha = 0.05):
             result_text = f"""
                 <div style='font-family: Times New Roman, font-size=12px;'>
                     <b>Alignment is worse than raw data</b><br>
-                    HMP = <b>{hmp:.2e}</b><br>
+                    Simes = <b>{s_val:.2e}</b><br>
                     &Delta;&sigma;<sup>2</sup>(total) = <b>{delta_var_all:.2e}</b><br>
                     &Delta;&sigma;<sup>2</sup>(sign.) = <b>{delta_var_significant:.2e}</b>
                 </div>
@@ -1614,7 +1615,7 @@ def construct_output(p_value, var_raw, var_aln,alpha = 0.05):
         result_text = f"""
             <div style='font-family: Times New Roman, font-size=12px;'>
                 <b>The differences are not significant</b><br>
-                HMP = <b>{hmp:.2e}</b><br>
+                Simes = <b>{s_val:.2e}</b><br>
                 &Delta;&sigma;<sup>2</sup>(total) = <b>{delta_var_all:.2e}</b><br>
                 &Delta;&sigma;<sup>2</sup>(sign.) = <b>{delta_var_significant:.2e}</b>
             </div>
@@ -2207,33 +2208,33 @@ def prepare_array(distances):
     result = pre_sorted[:, pre_sorted[0].argsort()]
     return result
 
-def HMP(p_value,w = None,alpha = 0.05,epsilon = 1e-10):
+def simes(p_value, alpha = 0.05):
     """
-    Calculate harmonic mean p-value with given weights
+    Calculate Simes method p-value for whole spectrum
 
     Parameters
     ----------
     p_value : ndarray
         p-value array
-    w : ndarray|None
-        weights array, equal size with p_value; if not given w = 1/len(p_value) will be used.
     alpha : float
         Confidence level. Default is 0.05
-    epsilon: float
-        Small value added to p-value to avoid division by zero
+
     Returns
     -------
     float
-        HMP value
+        simes value
+    bool
+        is test statistically significant
     """
 
-    if w is None:
-        w = np.full_like(p_value, 1/p_value.size)
+    p_vals = np.sort(p_value)
+    count = len(p_vals)
 
-    hmp = np.sum(w)/(np.sum(w/(p_value+epsilon)))
-    hmp_significance = hmp < alpha
+    simes_value = np.min(count*p_vals/np.arange(1, count+1))
 
-    return hmp, hmp_significance
+    simes_significance = simes_value < alpha
+
+    return simes_value, simes_significance
 
 def concover(arr1:np.ndarray,arr2:np.ndarray):
     """
@@ -2305,12 +2306,13 @@ def stat_params_paired_single(peak_raw, peak_aln, alpha=0.05,return_p = True):
 
     check_normal_func = lambda data,p: stats.kstest(data,'norm',args=(np.mean(data),np.std(data)))[1]>p
     check_normal = check_normal_func(peak_raw, alpha) & check_normal_func(peak_aln, alpha)
+    neq_var_p_val = stats.levene(peak_raw, peak_aln)[1]
     if check_normal:
-        neq_var_p_val = stats.levene(peak_raw, peak_aln)[1]
+        #neq_var_p_val = stats.levene(peak_raw, peak_aln)[1]
         neq_mean_p_val = stats.ttest_ind(peak_raw, peak_aln,nan_policy='omit')[1]
     else:
         neq_mean_p_val = stats.mannwhitneyu(peak_raw, peak_aln)[1]
-        neq_var_p_val = stats.ansari(peak_raw, peak_aln)[1]
+        #neq_var_p_val = stats.fligner(peak_raw, peak_aln)[1]
 
     if return_p:
         neq_var = neq_var_p_val
@@ -2318,7 +2320,7 @@ def stat_params_paired_single(peak_raw, peak_aln, alpha=0.05,return_p = True):
     else:
         neq_var = neq_var_p_val < alpha
         neq_mean = neq_mean_p_val < alpha
-    return np.nan_to_num(np.array([mean_r - mean_a, var_r, var_a,jsd(kde_single_peak(peak_raw,20),kde_single_peak(peak_aln,20)), float(neq_mean), float(neq_var)]),nan=0)
+    return np.array([mean_r - mean_a, var_r, var_a,jsd(kde_single_peak(peak_raw,20),kde_single_peak(peak_aln,20)), float(neq_mean), float(neq_var)])
 
 
 def stat_params_unpaired(ds):
