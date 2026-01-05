@@ -1,7 +1,7 @@
 [![Experimental](https://img.shields.io/badge/status-experimental-red.svg)](https://github.com/yourusername/yourrepo)
 [![Work in Progress](https://img.shields.io/badge/status-WIP-yellow.svg)](https://github.com/yourusername/yourrepo)
 
-MassSpecAlign - небольшой инструмент, написанный на Python, позволяющий проводить простой статистический анализ и оценивать качество множественного выравнивания масс-спектров, в первую очередь ориентированный для использования при подготовке MSI ([mass spectrometry imaging](https://en.wikipedia.org/wiki/Mass_spectrometry_imaging)).
+**MassSpecAlign** - небольшой инструмент, написанный на Python, позволяющий проводить простой статистический анализ и оценивать качество множественного выравнивания масс-спектров, в первую очередь ориентированный для использования при подготовке MSI ([mass spectrometry imaging](https://en.wikipedia.org/wiki/Mass_spectrometry_imaging)).
 
 * Данные загружаются в формате HDF файлов.
 * Предобработка для удаления артефактов
@@ -17,3 +17,9 @@ MassSpecAlign - небольшой инструмент, написанный н
 **Зависимости**
 
 Все зависимости перечислены в файлах requirements.py - каждый файл соответствует одной из версий программы. 
+
+---
+**Документация**
+
+(Со временем будет дополняться примерами)
+[https://1g0r2005.github.io/MassSpecAlign/]
