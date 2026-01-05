@@ -166,7 +166,10 @@ notes.txt
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+
+#disused code
 /SideTasks/
 /SideTasks/test.py
 Distance_from_ref/hungarian.py
-#/Distance_from_ref/docs/
+/DistancesFinal/
+
