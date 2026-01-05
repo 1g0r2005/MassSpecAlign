@@ -1,0 +1,13 @@
+diptest==0.10.0
+h5py==3.12.1
+KDEpy==1.1.11
+KDEpy==1.1.12
+numba==0.61.0
+numpy==2.4.0
+pandas==2.3.3
+PyYAML==6.0.1
+PyYAML==6.0.3
+rich==14.2.0
+scipy==1.16.3
+tqdm==4.66.6
+typer==0.21.0
