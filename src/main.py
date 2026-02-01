@@ -44,13 +44,6 @@ class Const:
         HDF5 path to the raw spectra dataset.
     DATASET_ALN : str or None
         HDF5 path to the aligned spectra dataset.
-    REF : float or None
-        Reference m/z value used to locate the reference peak.
-
-        .. warning::
-            This parameter is currently **not used** in the pipeline and will be removed
-            in a future version.
-
     DEV : float or None
         Acceptable deviation (±) around `REF` when searching for the reference peak.
     N_DOTS : int or None
@@ -63,7 +56,7 @@ class Const:
     #class attr
     DATASET_RAW: str | None= None
     DATASET_ALN: str | None = None
-    REF: float | None = None
+
     DEV: float | None = None
     N_DOTS: int | None = None
     BW: float | None = None
@@ -122,7 +115,7 @@ class WorkerSignals(QObject):
             # включаем параллельную обработку по умолчанию (все ядра минус одно)
             processes = max(1, min((os.cpu_count() or 2) - 1,3))
 
-            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.REF, Const.DEV, processes=processes)
+            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.DEV, processes=processes)
 
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -139,8 +132,8 @@ class WorkerSignals(QObject):
 
             borders_r = np.stack((left_r, right_r), axis=1)
             borders_a = np.stack((left_a, right_a), axis=1)
-            c_ds_raw = LinkedList(center_r, borders_r)#.sync_delete(np.where(max_center_r <= epsilon)[0])
-            c_ds_aln = LinkedList(center_a, borders_a)#.sync_delete(np.where(max_center_a <= epsilon)[0])
+            c_ds_raw = LinkedList(center_r, borders_r)
+            c_ds_aln = LinkedList(center_a, borders_a)
 
 
             c_ds_raw_intensity, c_ds_aln_intensity = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,
@@ -174,10 +167,6 @@ class WorkerSignals(QObject):
                         ((kde_x_aln, kde_y_aln), 'aln', 'blue', 'p', 'kde'),
                         (aln_kde_aln,np.max(kde_y_aln),'raw_peaks','mult','vln','kde'),
                         (aln_kde_raw, np.max(kde_y_aln), 'raw_peaks', 'mult', 'vln', 'kde'))),
-                #(c_ds_raw, np.max(kde_y_raw), 'raw_peaks', 'red', 'vln', 'kde'),
-                #(c_ds_aln, np.max(kde_y_aln), 'aln_peaks', 'blue', 'vln', 'kde'))),
-                #('stats', (stat_params_unpaired(peak_lists_raw).T, stat_params_unpaired(peak_lists_aln).T)),
-                #('stats_p', (stat_params_unpaired(aln_peak_lists_raw).T, stat_params_unpaired(aln_peak_lists_aln).T)),
                 ('stats',
                  ((stat_params_unpaired(peak_lists_raw).T, 'raw'), (stat_params_unpaired(peak_lists_aln).T, 'aln'))),
                 ('stats_p', ((stat_params_unpaired(aln_peak_lists_raw).T, 'raw'),
@@ -906,7 +895,7 @@ class MainPage(QWidget):
         config_panel = QtWidgets.QWidget()
         config_layout = QtWidgets.QVBoxLayout()
         config_panel.setLayout(config_layout)
-        #self.setLayout(self.right_layout)
+
 
         # Raw
         self.raw_layout = QtWidgets.QHBoxLayout()
@@ -926,7 +915,7 @@ class MainPage(QWidget):
         self.dataset_raw = QLineEdit()
         self.dataset_aln = QLineEdit()
 
-        self.ref_set = QLineEdit()
+
 
         self.raw_filename.setEnabled(False)
         self.aln_filename.setEnabled(False)
@@ -941,21 +930,20 @@ class MainPage(QWidget):
         form_layout.addRow(QLabel("Alignment data:"), self.aln_layout)
         form_layout.addRow(QLabel("Dataset (raw):"), self.dataset_raw)
         form_layout.addRow(QLabel("Dataset (aln):"), self.dataset_aln)
-        form_layout.addRow(QLabel("Reference point:"), self.ref_set)
+
         form_layout.addRow(QLabel("Acceptable deviation for msalign:"), self.dev_set)
         form_layout.addRow(QLabel("Bandwidth:"), self.bw_set)
         form_layout.addRow(QLabel("Number of dots:"), self.n_dots_set)
 
         self.config_button = QPushButton("Open config file")
         self.config_button.clicked.connect(lambda: self.open_config())
-        # self.load_config_button = QPushButton("Save configs")
-        # self.load_config_button.clicked.connect(lambda: self.save_config())
+
         self.calc_button = QPushButton("Calculate")
         config_layout.addWidget(self.config_button)
-        # config_layout.addWidget(self.load_config_button)
+
         config_layout.addWidget(self.calc_button)
         self.calc_button.clicked.connect(lambda: self.signal())
-        # self.calc_button.setEnabled(False)
+
         self.pbar_widget = QWidget()
         self.pbar_layout = QFormLayout(self.pbar_widget)
         self.pbar = QProgressBar()
@@ -983,7 +971,7 @@ class MainPage(QWidget):
                 yaml_config = yaml.load(f, Loader=yaml.FullLoader)
                 self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
                 self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
-                self.ref_set.setText(str(yaml_config['REF']))
+
                 self.dev_set.setText(str(yaml_config['DEV']))
                 self.dataset_raw.setText(str(yaml_config['DATASET_R']))
                 self.dataset_aln.setText(str(yaml_config['DATASET_A']))
@@ -1015,7 +1003,7 @@ class MainPage(QWidget):
                 yaml_config = yaml.load(f, Loader=yaml.FullLoader)
                 self.raw_filename.setText(yaml_config['FILE_NAMES'][0])
                 self.aln_filename.setText(yaml_config['FILE_NAMES'][1])
-                self.ref_set.setText(str(yaml_config['REF']))
+
                 self.dev_set.setText(str(yaml_config['DEV']))
                 self.dataset_raw.setText(str(yaml_config['DATASET_R']))
                 self.dataset_aln.setText(str(yaml_config['DATASET_A']))
@@ -1055,7 +1043,6 @@ class MainPage(QWidget):
         try:
             data = (self.raw_filename.text(),
                     self.aln_filename.text(),
-                    self.ref_set.text(),
                     self.dev_set.text(),
                     self.dataset_raw.text(),
                     self.dataset_aln.text(),
@@ -1068,16 +1055,19 @@ class MainPage(QWidget):
                 with open('last_config.yaml', 'w') as outfile:
                     yaml.dump({
                         'FILE_NAMES':(data[0],data[1]),
-                        'REF': float(data[2]),
-                        'DEV': float(data[3]),
-                        'DATASET_R':data[4],
-                        'DATASET_A':data[5],
-                        'BW':float(data[6]),
-                        'NDOTS':int(data[7])
+                        'DEV': float(data[2]),
+                        'DATASET_R':data[3],
+                        'DATASET_A':data[4],
+                        'BW':float(data[5]),
+                        'NDOTS':int(data[6])
                     }, outfile, default_flow_style=False)
-            Const.RAW, Const.ALN, Const.REF, Const.DEV, Const.DATASET_RAW,Const.DATASET_ALN, Const.BW, Const.N_DOTS = data[0], data[1], float(
-                data[2]), float(
-                data[3]), data[4],data[5], float(data[6]), int(data[7])
+            Const.RAW, Const.ALN, Const.DEV, Const.DATASET_RAW,Const.DATASET_ALN, Const.BW, Const.N_DOTS = (data[0],
+                                                                                                            data[1],
+                                                                                                            float(data[2]),
+                                                                                                            data[3],
+                                                                                                            data[4],
+                                                                                                            float(data[5]),
+                                                                                                            int(data[6]))
             # self.calc_button.setEnabled(True)
         except Exception as e:
             print(e)
@@ -1460,9 +1450,8 @@ class GraphPage(QWidget):
             if data[-2] == 'p':
                 self.add_plot(data[0], data[1], data[2], data[-1])
             elif data[-2] == 'vln':
-
                 self.add_dot(data[0], 0, data[3], data[-1])
-                #self.add_line(data[0], data[1], data[3], data[-1])
+
 
 
 class StatGraphPage(GraphPage):
@@ -1477,13 +1466,7 @@ class StatGraphPage(GraphPage):
         super().__init__(parent, canvas_count=4, title=title, title_plots=('std_dev', 'modality (dip test) p-value', 'skewness', 'kurtosis'),
                          x_labels=x_labels, y_labels=y_labels, color=color, bg_color=bg_color,autoSize=False)
 
-
-        #self.table_un = pg.TableWidget()  # сколько всего точек, медианное отклонение, число точек не мономодальных
-        #self.table_list = {'unpaired': self.table_un}
-
         self.p = p_val
-        #self.table_data = np.zeros((3, 2))
-
         self.layout.setStretch(0, 1)  # Виджет 1
         self.layout.setStretch(1, 1)  # Виджет 2
         self.layout.setStretch(2, 1)  # Виджет 3
@@ -1523,18 +1506,14 @@ class StatGraphPage(GraphPage):
             data_name = ds[n][1]
             ds_color = self.fixed_colors[n]
 
-            #self.table_data[0, n] = len(data[0])
+
 
             self.add_plot(data[0], f'st dev {data_name}', ds_color, 'std_dev')
             self.add_plot(data[2], f'dip {data_name}', ds_color, 'modality (dip test) p-value')
             self.add_line(data = 0.05,y_max=len(data[2]),canvas_name='modality (dip test) p-value',color='black')
             self.add_plot(data[3], f'skew {data_name}', ds_color, 'skewness')
             self.add_plot(data[4], f'kurt {data_name}', ds_color, 'kurtosis')
-            #self.table_data[1, n] = np.where(data[2] < self.p)[0].size
-            #self.table_data[2, n] = np.median(data[0])
-        #self.table_un.setData(self.table_data)
-        #self.table_un.setHorizontalHeaderLabels([str(i) for i in range(len(ds))])
-        #self.table_un.setVerticalHeaderLabels(['total', 'is multimodal', 'median std dev'])
+
 
     def add_plot(self, data, plot_name, color, canvas_name=None):
         """
@@ -1893,7 +1872,7 @@ _IDX = None          # (mz_idx_raw, intensity_idx_raw, spectra_idx_raw, mz_idx_a
 _REF_DEV = None      # (REF, DEV)
 
 
-def pool_initializer(data_raw, data_aln, idx_tuple, ref, dev):
+def pool_initializer(data_raw, data_aln, idx_tuple, dev):
     """
     Pool initializer: store global references to datasets, indices, and params.
 
@@ -1906,22 +1885,20 @@ def pool_initializer(data_raw, data_aln, idx_tuple, ref, dev):
     idx_tuple : tuple[int, int, int, int, int, int]
         ``(mz_idx_raw, intensity_idx_raw, spectra_idx_raw, mz_idx_aln,
         intensity_idx_aln, spectra_idx_aln)`` indices into the datasets.
-    ref : float
-        Reference m/z value for ``find_ref``.
     dev : float
         Allowed deviation (±) around ``ref`` for reference search.
 
     Notes
     -----
     Stores the arguments into module-level globals (``_DATA_RAW``, ``_DATA_ALN``,
-    ``_IDX``, ``_REF_DEV``) to avoid repeated pickling and argument passing to
+    ``_IDX``, ``_DEV``) to avoid repeated pickling and argument passing to
     worker processes.
     """
-    global _DATA_RAW, _DATA_ALN, _IDX, _REF_DEV
+    global _DATA_RAW, _DATA_ALN, _IDX, _DEV
     _DATA_RAW = data_raw
     _DATA_ALN = data_aln
     _IDX = idx_tuple
-    _REF_DEV = (ref, dev)
+    _DEV = dev
 
 
 def process_spectrum(task):
@@ -1942,7 +1919,7 @@ def process_spectrum(task):
     """
     spec_id, r0, r1, a0, a1 = task
     mz_idx_raw, intensity_idx_raw, _s_idx_r, mz_idx_aln, intensity_idx_aln, _s_idx_a = _IDX
-    REF, DEV = _REF_DEV
+    DEV = _DEV
 
     # извлечь и отсортировать по m/z
     data_raw_unsorted = _DATA_RAW[[mz_idx_raw, intensity_idx_raw], r0:r1 + 1]
@@ -1961,47 +1938,12 @@ def process_spectrum(task):
 
     checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
 
-    _, ref_aln = find_ref(checked_aln, REF, DEV)
-    _, ref_raw = find_ref(checked_raw, REF, DEV)
-
-    checked_raw.reference = ref_raw
-    checked_aln.reference = ref_aln
-
     return spec_id, np.array(checked_raw), np.array(checked_aln)
 
 
-def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0) -> [float, float]:
-    """
-    Locate a reference peak near an approximate m/z within a deviation window.
-
-    Parameters
-    ----------
-    dataset : Dataset
-        Sorted m/z values (primary) with intensities as linked data.
-    approx_mz : float
-        Approximate m/z for the reference.
-    deviation : float, optional
-        Allowed deviation around `approx_mz` for candidate search.
-
-    Returns
-    -------
-    tuple
-        Pair ``(index, mz)`` of the selected reference peak.
-    """
-    condition_1 = approx_mz - deviation <= dataset
-    condition_2 = approx_mz + deviation >= dataset
-
-    where_construct = np.where(condition_1 & condition_2)
-    if where_construct[0].size:
-        ref_index = where_construct[0][np.argmax(dataset.linked_array[where_construct])]
-    else:
-        ref_index = np.argmin(np.abs(dataset - approx_mz))
-
-    return ref_index, dataset[ref_index]
-
 
 def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np.ndarray,
-                 attrs_aln: list, REF, DEV, limit=None, processes: int = 0):
+                 attrs_aln: list, DEV, limit=None, processes: int = 0):
     """
     Prepare per-spectrum datasets and emit progress for the UI, with optional
     sequential or parallel execution (multiprocessing.Pool).
@@ -2033,8 +1975,6 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
         Raw and aligned datasets read from HDF5.
     attrs_raw, attrs_aln : list of str
         Column headers for the respective datasets.
-    REF : float
-        Reference m/z seed.
     DEV : float
         Acceptable deviation (±) around ``REF`` for reference search.
     limit : int or None, optional
@@ -2122,12 +2062,6 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
 
             checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
 
-            _, ref_aln = find_ref(checked_aln, REF, DEV)
-            _, ref_raw = find_ref(checked_raw, REF, DEV)
-
-            checked_raw.reference = ref_raw
-            checked_aln.reference = ref_aln
-
             dataset_list[0, spec_id] = np.array(checked_raw)
             dataset_list[1, spec_id] = np.array(checked_aln)
             self.progress.emit(spec_n)
@@ -2147,7 +2081,7 @@ def read_dataset(self, dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np
         dataset_aln,
         (mz_idx_raw, intensity_idx_raw, spectra_idx_raw,
          mz_idx_aln, intensity_idx_aln, spectra_idx_aln),
-        REF, DEV,
+        DEV,
     )
 
     multiprocessing.util.FINALIZE_MAX_DELAY = 10
@@ -2308,11 +2242,11 @@ def stat_params_paired_single(peak_raw, peak_aln, alpha=0.05,return_p = True):
     check_normal = check_normal_func(peak_raw, alpha) & check_normal_func(peak_aln, alpha)
     neq_var_p_val = stats.levene(peak_raw, peak_aln)[1]
     if check_normal:
-        #neq_var_p_val = stats.levene(peak_raw, peak_aln)[1]
+
         neq_mean_p_val = stats.ttest_ind(peak_raw, peak_aln,nan_policy='omit')[1]
     else:
         neq_mean_p_val = stats.mannwhitneyu(peak_raw, peak_aln)[1]
-        #neq_var_p_val = stats.fligner(peak_raw, peak_aln)[1]
+
 
     if return_p:
         neq_var = neq_var_p_val
