@@ -2,6 +2,8 @@ import multiprocessing
 import os
 
 import numpy as np
+import pyimzml
+from pyimzml.ImzMLParser import ImzMLParser
 
 os.environ['PYQTGRAPH_QT_LIB'] = 'PyQt5'
 
@@ -21,12 +23,11 @@ from PyQt5 import QtCore
 from KDEpy import FFTKDE
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal, Qt, QThread
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QFont, QResizeEvent
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLineEdit, QLabel, QPushButton, \
     QFormLayout, QFileDialog, QTableWidgetItem, QTableWidget, QVBoxLayout, QHeaderView, QAbstractItemView, QSplitter, \
     QHBoxLayout, QTreeWidget, QTreeWidgetItem, QProgressBar
 from diptest import diptest
-from numba import njit
 import alignment
 from data_classes import *
 from scipy.special import rel_entr
@@ -60,6 +61,10 @@ class Const:
     DEV: float | None = None
     N_DOTS: int | None = None
     BW: float | None = None
+
+    #file extensions
+    HDF = ['.hdf5', '.hdf', '.he5', '.h5']
+    IMZML = ['.imzML']
 
 
 class WorkerSignals(QObject):
@@ -108,14 +113,29 @@ class WorkerSignals(QObject):
         """
 
         try:
+            processes = max(1, min((os.cpu_count() or 2) - 1, 3))
 
-            features_raw, attrs_raw = File(Const.RAW).read(Const.DATASET_RAW)
-            features_aln, attrs_aln = File(Const.ALN).read(Const.DATASET_ALN)
+            file_raw, file_aln = File(Const.RAW), File(Const.ALN)
+            ext_raw, ext_aln = file_raw.extension, file_aln.extension
 
+            if ext_raw in Const.IMZML and ext_aln in Const.IMZML:
+                p_raw = file_raw.read()
+                p_aln = file_aln.read()
+                distance_list = read_imz_dataset(self,p_raw,p_aln,processes=processes)
+            elif ext_raw in Const.HDF and ext_aln in Const.HDF:
+                features_raw, attrs_raw = file_raw.read(Const.DATASET_RAW)
+                features_aln, attrs_aln = file_aln.read(Const.DATASET_ALN)
+                distance_list = read_dataset(self, features_raw, attrs_raw, features_aln, attrs_aln, Const.DEV,
+                                             processes=processes)
+            else:
+                raise Exception('Different file formats are not supported')
+
+            print('Data loaded')
             # включаем параллельную обработку по умолчанию (все ядра минус одно)
-            processes = max(1, min((os.cpu_count() or 2) - 1,3))
 
-            distance_list = read_dataset(self,features_raw, attrs_raw, features_aln, attrs_aln, Const.DEV, processes=processes)
+
+
+
 
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
@@ -129,19 +149,21 @@ class WorkerSignals(QObject):
             # восстановим высоту пиков
             max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
                                                                                             kde_y_aln)
-
+            print('Peak evaluation finished')
             borders_r = np.stack((left_r, right_r), axis=1)
             borders_a = np.stack((left_a, right_a), axis=1)
             c_ds_raw = LinkedList(center_r, borders_r)
             c_ds_aln = LinkedList(center_a, borders_a)
 
+            print('LinkedList created')
 
             c_ds_raw_intensity, c_ds_aln_intensity = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,
                                                                                                     kde_y_aln)
 
-
-            peak_lists_raw = sort_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
-            peak_lists_aln = sort_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
+            print('Just before sortind')
+            ##### заменили sort_dots на sorting_dots
+            peak_lists_raw = sorting_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
+            peak_lists_aln = sorting_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
             print(raw_concat)
             print(peak_lists_raw)
@@ -497,12 +519,12 @@ class Dataset(LinkedList):
 
 class File:
     """
-    Thin wrapper around an HDF5 file to read datasets and their headers.
+    Thin wrapper around an data (hdf5 of imzml) file to read datasets and their headers.
 
     Parameters
     ----------
     file_name : str or Path
-        Path to the HDF5 file.
+        Path to the file.
 
     Attributes
     ----------
@@ -519,6 +541,7 @@ class File:
             Path to the HDF5 file.
         """
         self.real_path = Path(file_name)
+        self.extension = self.real_path.suffix
 
     def exist(self):
         """
@@ -531,7 +554,7 @@ class File:
         """
         return self.real_path.exists()
 
-    def read(self, dataset):
+    def read(self, dataset = None):
         """
         Read a dataset and its column headers from the HDF5 file.
 
@@ -557,16 +580,21 @@ class File:
             if not self.exist():
                 raise FileNotFoundError
 
-            with h5py.File(self.real_path, 'r') as f:
-                if dataset in f:
-                    data = f[dataset][:]
-                    attr = f[dataset].attrs["Column headers"]
+            if self.extension in Const.IMZML:
 
-                    if len(attr) != f[dataset].shape[0] and len(attr) == f[dataset].shape[1]:
-                        data = data.T
-                    elif len(attr) != f[dataset].shape[0] and len(attr) != f[dataset].shape[1]:
-                        raise Exception("The number of columns does not match the number of headers")
-                    return data, attr
+                return ImzMLParser(self.real_path, include_spectra_metadata="full")
+
+            elif self.extension in Const.HDF:
+                with h5py.File(self.real_path, 'r') as f:
+                    if dataset in f:
+                        data = f[dataset][:]
+                        attr = f[dataset].attrs["Column headers"]
+
+                        if len(attr) != f[dataset].shape[0] and len(attr) == f[dataset].shape[1]:
+                            data = data.T
+                        elif len(attr) != f[dataset].shape[0] and len(attr) != f[dataset].shape[1]:
+                            raise Exception("The number of columns does not match the number of headers")
+                        return data, attr
         except FileNotFoundError:
             print(f'File {self.real_path} not found')
             return None
@@ -636,6 +664,33 @@ class TreeWidget(QWidget):
         self.tree = QTreeWidget()
         self.__initUI()
 
+        self.overlay_info = QLabel('Unable to load structure for this data format',self)
+        self.overlay_info.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.overlay_info.setStyleSheet("""
+                    color: #FFFFFF;
+                    background: rgba(0, 0, 0, 180);
+                    border-radius: 6px;
+                    padding: 8px 16px;
+                """)
+        self.overlay_info.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        self.overlay_info.setAlignment(Qt.AlignCenter)
+        self.overlay_info.hide()
+
+
+    def setEnabled(self, enabled: bool):
+        """
+        Redefining setEnabled to add QLabel for info text
+        """
+        super().setEnabled(enabled)
+        if not enabled:
+            self.overlay_info.show()
+            self.overlay_info.raise_()
+        else:
+            self.overlay_info.hide()
+
+    def resizeEvent(self, event: QResizeEvent):
+        super().resizeEvent(event)
+        self.overlay_info.resize(self.size())
     def __initUI(self):
         """
         Configure the internal QTreeWidget and layout.
@@ -680,6 +735,15 @@ class TreeWidget(QWidget):
                     child.setText(2,str(obj.shape))
                     child.setText(3,str(obj.dtype))
                     child.setIcon(0, QIcon("ds_ico.png"))
+
+        if Path(path).suffix in Const.HDF:
+            self.setEnabled(True)
+        else:
+            #для imzML не получаем
+            print(f"File doesn't have hierarchical structure")
+            self.setEnabled(False)
+            return
+
 
         with h5py.File(path,'r') as f:
             root = QTreeWidgetItem(self.tree)
@@ -1679,89 +1743,19 @@ def peak_picking(X, Y, oversegmentation_filter=None, peak_location=1):
                 pk_x[idx] = np.sum(Y[lm:rm][mask] * X[lm:rm][mask]) / np.sum(Y[lm:rm][mask])
     return pk_x, X[left_min], X[right_min]
 
-@njit()
-def sort_dots_numba(ds: np.ndarray, left: np.ndarray, right: np.ndarray) -> list:
-    """
-    Group values into bins defined by paired left/right boundaries.
-
-    Parameters
-    ----------
-    ds : ndarray
-        Values to be grouped.
-    left : ndarray
-        Left boundaries for each bin.
-    right : ndarray
-        Right boundaries for each bin.
-
-    Returns
-    -------
-    flat_grouped_values : ndarray
-        Concatenated values from all bins.
-    split_indices : ndarray
-        Indices to split `flat_grouped_values` into original bins.
-    """
-
-    num_intervals = left.size
-    num_ds = ds.size
-
-    # 1. Сначала подсчитываем, сколько элементов попадает в каждый интервал
-    counts = np.zeros(num_intervals, dtype=np.int64)
-    for i in range(num_intervals):
-        # np.sum() на булевом массиве работает в nopython режиме
-        counts[i] = np.sum((ds >= left[i]) & (ds <= right[i]))
-
-    # 2. Вычисляем индексы для разделения. Это будет [0, count_0, count_0+count_1, ...]
-    split_indices = np.zeros(num_intervals + 1, dtype=np.int64)
-    split_indices[1:] = np.cumsum(counts)
-
-    # 3. Создаем плоский массив для всех найденных значений
-    total_elements = split_indices[-1]
-    flat_grouped_values = np.empty(total_elements, dtype=ds.dtype)
-
-    # Создаем копию индексов, чтобы отслеживать, куда вставлять следующий элемент для каждого интервала
-    current_indices = split_indices.copy()
-
-    for i in range(num_ds):
-        val = ds[i]
-        for j in range(num_intervals):
-            if left[j] <= val <= right[j]:
-                # Находим позицию для вставки и вставляем значение
-                idx_to_insert = current_indices[j]
-                flat_grouped_values[idx_to_insert] = val
-                # Увеличиваем индекс для следующего элемента в этом интервале
-                current_indices[j] += 1
-                # Поскольку интервалы не пересекаются, можно прервать внутренний цикл
-                break
-
-    return flat_grouped_values, split_indices
-
-
-def sort_dots(ds: np.ndarray, left: np.ndarray, right: np.ndarray) -> list:
-    """
-    Wrapper above sort_dots_numba to return grouped values as a list.
-
-    Parameters
-    ----------
-    ds : ndarray
-        Values to be grouped.
-    left : ndarray
-        Left boundaries for each bin.
-    right : ndarray
-        Right boundaries for each bin.
-
-    Returns
-    -------
-    list of ndarray
-        For each interval [left[i], right[i]], the subset of `ds` within it.
-    """
+def sorting_dots(ds: np.ndarray, left: np.ndarray, right: np.ndarray) -> list:
     if len(left) == 0:
         return []
 
-    flat_values, split_ind = sort_dots_numba(ds, left, right)
+    ds_sorted = np.sort(ds)
 
-    ret = np.split(flat_values, split_ind[1:-1])
+    # Находим границы каждого бина в отсортированном массиве
+    starts = np.searchsorted(ds_sorted, left, side='left')
+    ends = np.searchsorted(ds_sorted, right, side='right')
+
+    # Формируем список срезов (views, без лишнего копирования)
+    ret = [ds_sorted[start:end] for start, end in zip(starts, ends)]
     return ret
-
 
 def get_long_and_short(arr_1: np.ndarray, arr_2: np.ndarray) -> (np.ndarray, np.ndarray, bool):
     """
@@ -1900,23 +1894,27 @@ def pool_initializer(data_raw, data_aln, idx_tuple, dev):
     _IDX = idx_tuple
     _DEV = dev
 
+def pool_initializer_imz(fn_raw,fn_aln):
+    global parser_raw_g, parser_aln_g
+    parser_raw_g = ImzMLParser(fn_raw)
+    parser_aln_g = ImzMLParser(fn_aln)
 
 def process_spectrum(task):
     """
-    Process a single spectrum task and return datasets for raw and aligned.
+        Process a single spectrum task and return datasets for raw and aligned.
 
-    Parameters
-    ----------
-    task : tuple[int, int, int, int, int]
-        ``(spec_id, r0, r1, a0, a1)`` where ``[r0:r1]`` and ``[a0:a1]`` are
-        inclusive slices for raw and aligned blocks belonging to ``spec_id``.
+        Parameters
+        ----------
+        task : tuple[int, int, int, int, int]
+            ``(spec_id, r0, r1, a0, a1)`` where ``[r0:r1]`` and ``[a0:a1]`` are
+            inclusive slices for raw and aligned blocks belonging to ``spec_id``.
 
-    Returns
-    -------
-    tuple
-        ``(spec_id, arr_raw, arr_aln)`` where ``arr_raw`` and ``arr_aln`` are
-        NumPy arrays representing ``Dataset`` instances for the spectrum.
-    """
+        Returns
+        -------
+        tuple
+            ``(spec_id, arr_raw, arr_aln)`` where ``arr_raw`` and ``arr_aln`` are
+            NumPy arrays representing ``Dataset`` instances for the spectrum.
+        """
     spec_id, r0, r1, a0, a1 = task
     mz_idx_raw, intensity_idx_raw, _s_idx_r, mz_idx_aln, intensity_idx_aln, _s_idx_a = _IDX
     DEV = _DEV
@@ -1939,6 +1937,58 @@ def process_spectrum(task):
     checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
 
     return spec_id, np.array(checked_raw), np.array(checked_aln)
+
+def process_spectrum_imz(num):
+    mzs_raw, intensities_raw = parser_raw_g.getspectrum(num)
+    mzs_aln, intensities_aln = parser_aln_g.getspectrum(num)
+    data_raw_linked = Dataset(mzs_raw, intensities_raw)
+    data_aln_linked = Dataset(mzs_aln, intensities_aln)
+
+    checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
+
+    return (num,np.array(checked_raw),np.array(checked_aln))
+
+
+def read_imz_dataset(self,parser_raw:pyimzml.ImzMLParser,parser_aln:pyimzml.ImzMLParser,limit=None,processes: int = 0):
+    len_raw, len_aln = len(parser_raw.coordinates), len(parser_aln.coordinates)
+    if len_raw != len_aln:
+        raise Exception('Length of raw and aln is not equal!')
+
+    set_num = len_aln
+    if limit is not None:
+        set_num = min(set_num, limit)
+
+    dataset_list = np.empty((2, set_num), dtype=Dataset)
+    tasks = list(range(set_num))
+
+    self.create_pbar.emit((0, len(tasks)))
+
+    if processes <= 0:
+        for num in tasks:
+            mzs_raw, intensities_raw = parser_raw.getspectrum(num)
+            mzs_aln, intensities_aln = parser_aln.getspectrum(num)
+            data_raw_linked = Dataset(mzs_raw, intensities_raw)
+            data_aln_linked = Dataset(mzs_aln, intensities_aln)
+
+            checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
+
+            dataset_list[0, num] = np.array(checked_raw)
+            dataset_list[1, num] = np.array(checked_aln)
+            self.progress.emit(num+1)
+        return dataset_list
+
+    init_args = (parser_raw.filename, parser_aln.filename)
+
+    with Pool(processes=processes,
+              initializer=pool_initializer_imz,
+              initargs=init_args) as pool:
+        completed_tasks = 0
+        for num, raw_ds, aln_ds in pool.imap_unordered(process_spectrum_imz,tasks):
+            dataset_list[0, num] = raw_ds
+            dataset_list[1, num] = aln_ds
+            completed_tasks += 1
+            self.progress.emit(completed_tasks)
+    return dataset_list
 
 
 

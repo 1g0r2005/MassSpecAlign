@@ -527,10 +527,10 @@ def verify_datasets(data_1: LinkedList, data_2: LinkedList, threshold=1.0) -> (L
 _DATA_RAW = None
 _DATA_ALN = None
 _IDX = None          # (mz_idx_raw, intensity_idx_raw, spectra_idx_raw, mz_idx_aln, intensity_idx_aln, spectra_idx_aln)
-_REF_DEV = None      # (REF, DEV)
+_DEV = None
 
 
-def pool_initializer(data_raw, data_aln, idx_tuple, ref, dev):
+def pool_initializer(data_raw, data_aln, idx_tuple, dev):
     """
     Pool initializer: store global references to datasets, indices, and params.
 
@@ -554,11 +554,11 @@ def pool_initializer(data_raw, data_aln, idx_tuple, ref, dev):
     ``_IDX``, ``_REF_DEV``) to avoid repeated pickling and argument passing to
     worker processes.
     """
-    global _DATA_RAW, _DATA_ALN, _IDX, _REF_DEV
+    global _DATA_RAW, _DATA_ALN, _IDX, _DEV
     _DATA_RAW = data_raw
     _DATA_ALN = data_aln
     _IDX = idx_tuple
-    _REF_DEV = (ref, dev)
+    _DEV = dev
 
 
 def process_spectrum(task):
@@ -579,7 +579,7 @@ def process_spectrum(task):
     """
     spec_id, r0, r1, a0, a1 = task
     mz_idx_raw, intensity_idx_raw, _s_idx_r, mz_idx_aln, intensity_idx_aln, _s_idx_a = _IDX
-    REF, DEV = _REF_DEV
+    DEV = _DEV
 
     # извлечь и отсортировать по m/z
     data_raw_unsorted = _DATA_RAW[[mz_idx_raw, intensity_idx_raw], r0:r1 + 1]
@@ -598,11 +598,7 @@ def process_spectrum(task):
 
     checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
 
-    _, ref_aln = find_ref(checked_aln, REF, DEV)
-    _, ref_raw = find_ref(checked_raw, REF, DEV)
 
-    checked_raw.reference = ref_raw
-    checked_aln.reference = ref_aln
 
     return spec_id, np.array(checked_raw), np.array(checked_aln)
 
@@ -638,7 +634,7 @@ def find_ref(dataset: Dataset, approx_mz: float, deviation=1.0) -> [float, float
 
 
 def read_dataset( dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np.ndarray,
-                 attrs_aln: list, REF, DEV, limit=None, processes: int = 0):
+                 attrs_aln: list, DEV, limit=None, processes: int = 0):
     """
     Prepare per-spectrum datasets and emit progress for the UI, with optional
     sequential or parallel execution (multiprocessing.Pool).
@@ -649,8 +645,7 @@ def read_dataset( dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np.ndar
     - Build contiguous segments for each spectrum id based on the spectra index.
     - Create tasks only for spectrum ids present in both raw and aligned inputs.
     - For each task: slice the subarrays, sort by m/z, verify alignment
-      (``verify_datasets``), find a reference peak around ``REF`` within ``DEV``
-      (``find_ref``), and store the result as a ``Dataset`` with a ``reference``.
+      (``verify_datasets``)
 
     Modes
     -----
@@ -667,8 +662,6 @@ def read_dataset( dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np.ndar
         Raw and aligned datasets read from HDF5.
     attrs_raw, attrs_aln : list of str
         Column headers for the respective datasets.
-    REF : float
-        Reference m/z seed.
     DEV : float
         Acceptable deviation (±) around ``REF`` for reference search.
     limit : int or None, optional
@@ -756,12 +749,6 @@ def read_dataset( dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np.ndar
 
             checked_raw, checked_aln = verify_datasets(data_raw_linked, data_aln_linked, 1)
 
-            _, ref_aln = find_ref(checked_aln, REF, DEV)
-            _, ref_raw = find_ref(checked_raw, REF, DEV)
-
-            checked_raw.reference = ref_raw
-            checked_aln.reference = ref_aln
-
             dataset_list[0, spec_id] = np.array(checked_raw)
             dataset_list[1, spec_id] = np.array(checked_aln)
 
@@ -781,7 +768,7 @@ def read_dataset( dataset_raw: np.ndarray, attrs_raw: list, dataset_aln: np.ndar
         dataset_aln,
         (mz_idx_raw, intensity_idx_raw, spectra_idx_raw,
          mz_idx_aln, intensity_idx_aln, spectra_idx_aln),
-        REF, DEV,
+         DEV,
     )
 
     #multiprocessing.util.FINALIZE_MAX_DELAY = 10
@@ -1060,14 +1047,14 @@ def criteria_apply(arr, intensity):
         arr_out.linked_array[index-1] = sorted([arr.linked_array[index-1,0],arr.linked_array[index,1]])
     return arr_out.sync_delete(indexes)
 
-def calculate(raw_path:str, ds_raw:str, aln_path:str, ds_aln:str, ref:int, dev:float=1.0, bandwidth:float=0.2, n_dots:int=20_000):
+def calculate(raw_path:str, ds_raw:str, aln_path:str, ds_aln:str, dev:float=1.0, bandwidth:float=0.2, n_dots:int=20_000):
     try:
         features_raw, attrs_raw = File(raw_path).read(ds_raw)
         features_aln, attrs_aln = File(aln_path).read(ds_aln)
 
         processes = max(1, min((os.cpu_count() or 2) - 1, 3))
 
-        distance_list = read_dataset(features_raw, attrs_raw, features_aln, attrs_aln, ref, dev,
+        distance_list = read_dataset(features_raw, attrs_raw, features_aln, attrs_aln, dev,
                                      processes=processes, limit = 1000)
 
         distance_list_prepared = prepare_array(distance_list)
@@ -1206,7 +1193,6 @@ def get_arguments(config_path:Optional[Path]) -> Dict[str, Any]:
                     typer.echo('Error: YAML configuration file must be a dictionary.')
                 settings['raw_path'] = yaml_config['FILE_NAMES'][0]
                 settings['aln_path'] = yaml_config['FILE_NAMES'][1]
-                settings['ref'] = yaml_config['REF']
                 settings['dev'] = yaml_config['DEV']
                 settings['ds_raw'] = yaml_config['DATASET_R']
                 settings['ds_aln'] = yaml_config['DATASET_R']
@@ -1224,7 +1210,6 @@ def get_arguments(config_path:Optional[Path]) -> Dict[str, Any]:
 def run(config: Optional[Path] = typer.Option(None,'-c','--config',help='Config file (if exists)'),
         raw_path: Optional[Path] = typer.Option(None,'-rp','--raw-path',help='Path to the HDF file with raw data'),
         aln_path: Optional[Path] = typer.Option(None,'-ap','--aln-path',help='Path to the HDF file with aligned data'),
-        ref: Optional[float] = typer.Option(None,'-r','--ref',help='Reference peak position (now disused)'),
         dev: Optional[float] = typer.Option(None,'-d','--dev',help='The acceptable m/z deviation for peak positions'),
         ds_raw: Optional[str] = typer.Option(None,'-rd','--raw-dataset',help='Path to the dataset inside HDF for raw data'),
         ds_aln: Optional[str] = typer.Option(None,'-ad','--aln-dataset',help='Path to the dataset inside HDF for aligned data'),
@@ -1239,14 +1224,13 @@ def run(config: Optional[Path] = typer.Option(None,'-c','--config',help='Config 
     settings.setdefault('n_dots', 10_000)
     settings.setdefault('dev', 1.0)
 
-    required_arguments = ['raw_path','aln_path','ref','ds_raw','ds_aln']
+    required_arguments = ['raw_path','aln_path','ds_raw','ds_aln']
 
     if raw_path is not None:
         settings['raw_path'] = Path(raw_path)
     if aln_path is not None:
         settings['aln_path'] = Path(aln_path)
-    if ref is not None:
-        settings['ref'] = float(ref)
+
     if dev is not None:
         settings['dev'] = float(dev)
     if ds_raw is not None:
