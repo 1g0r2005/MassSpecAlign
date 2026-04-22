@@ -59,7 +59,9 @@ def munkres(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=0.4,sk
     ch_count_arr = lambda n, ln : n//ln + int(n%ln != 0)
     choose_split = lambda arr, ch_count: arr.sync_split(ch_count) if type(arr) is LinkedList else np.array_split(np.asarray(arr,dtype='object'), ch_count, axis=0)
 
-    chunk_count = min(ch_count_arr(x_len, segmentation_threshold), ch_count_arr(y_len, segmentation_threshold))
+    chunk_count = (min(ch_count_arr(x_len, segmentation_threshold),
+                       ch_count_arr(y_len, segmentation_threshold)))
+
 
     chunk_ags = [choose_split(x_arr, chunk_count),
                           choose_split(y_arr, chunk_count),
@@ -140,7 +142,6 @@ def munkres_align(x_arr,y_arr,x_linked,y_linked,intens_x,intens_y,skip_fraction=
     x_n,y_n = __equal_size(x,y)
 
     matrix = __make_matrix(x_n,y_n,skip_fraction,skip_level)
-    #print(f'matrix shape {matrix.shape}')
     indexes = np.array(linear_sum_assignment(matrix))
     condition = (indexes[0,:] < x_len) & (indexes[1,:] < y_len)
     xind  = indexes[:,condition][0]

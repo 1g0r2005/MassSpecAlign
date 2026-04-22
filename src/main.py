@@ -132,11 +132,6 @@ class WorkerSignals(QObject):
 
             print('Data loaded')
             # включаем параллельную обработку по умолчанию (все ядра минус одно)
-
-
-
-
-
             distance_list_prepared = prepare_array(distance_list)
             raw_concat, aln_concat, id_concat = distance_list_prepared
 
@@ -162,11 +157,31 @@ class WorkerSignals(QObject):
 
             print('Just before sortind')
             ##### заменили sort_dots на sorting_dots
+
+
+
             peak_lists_raw = sorting_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
             peak_lists_aln = sorting_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
 
-            print(raw_concat)
-            print(peak_lists_raw)
+            ####
+            def clean_peak_lists(peak_lists, intensities):
+                """Удаляем пустые/NaN кластеры"""
+                cleaned = []
+                cleaned_int = []
+                for p, inten in zip(peak_lists, intensities):
+                    if len(p) == 0 or np.isnan(inten) or np.isinf(inten):
+                        continue  # пропускаем полностью плохие кластеры
+                    mean_int = np.mean(p) if len(p) > 0 else inten
+                    cleaned.append(p)
+                    cleaned_int.append(mean_int)
+                return cleaned, np.array(cleaned_int)
+
+            # Применяем очистку
+            peak_lists_raw, c_ds_raw_intensity = clean_peak_lists(peak_lists_raw, c_ds_raw_intensity)
+            peak_lists_aln, c_ds_aln_intensity = clean_peak_lists(peak_lists_aln, c_ds_aln_intensity)
+            ####
+
+
             aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = alignment.munkres(peak_lists_raw,
                                                                                                  peak_lists_aln,
                                                                                                  c_ds_raw,
@@ -1807,6 +1822,7 @@ def get_opt_strip(arr_long: Dataset, arr_short: Dataset, flag: bool) -> (Dataset
     shift_array = np.arange(max_shift)
     score_array = np.zeros(max_shift)
     for i in shift_array:
+
         fit_score = np.mean((arr_short - arr_long[i:i + size]) ** 2)
         score_array[i] = fit_score
     opt_shift = np.where(score_array == score_array.min())[0][0]
@@ -2282,7 +2298,10 @@ def stat_params_paired_single(peak_raw, peak_aln, alpha=0.05,return_p = True):
     """
     # вычислить среднее и дисперсии, проверить нормальность, проверить гипотезы о значимости различия средних и дисперсий, возможно посчитать форму распределения
     jsd = lambda p,q: 0.5*(sum(rel_entr(p,q))+sum(rel_entr(q,p)))
-    kde_single_peak = lambda dots,n_eval: FFTKDE(bw='silverman',kernel='gaussian').fit(dots).evaluate(n_eval)[1]
+
+    kde_single_peak = lambda dots, n_eval: FFTKDE(bw='silverman', kernel='triweight').fit(dots).evaluate(
+        np.linspace(np.min(dots) - 1e-10, np.max(dots) + 1e-10, n_eval)
+    )
 
     norm_var = lambda data: np.var(data-np.mean(data),ddof=1)
     mean_r, mean_a = np.mean(peak_raw), np.mean(peak_aln)
