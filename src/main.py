@@ -32,6 +32,12 @@ import alignment
 from data_classes import *
 from scipy.special import rel_entr
 import pandas as pd
+
+
+###
+from skimage.filters import  threshold_triangle
+
+###
 """classes declaration"""
 
 
@@ -147,9 +153,14 @@ class WorkerSignals(QObject):
             print('Peak evaluation finished')
             borders_r = np.stack((left_r, right_r), axis=1)
             borders_a = np.stack((left_a, right_a), axis=1)
-            c_ds_raw = LinkedList(center_r, borders_r)
-            c_ds_aln = LinkedList(center_a, borders_a)
 
+            all_int = np.concatenate((max_center_a,max_center_r))
+
+            threshold = threshold_triangle(all_int)
+            print('Triangle threshold = {}'.format(threshold))
+
+            c_ds_raw = LinkedList(center_r, borders_r).sync_delete(np.where(max_center_r <=  threshold)[0])
+            c_ds_aln = LinkedList(center_a, borders_a).sync_delete(np.where(max_center_a <=  threshold)[0])
             print('LinkedList created')
 
             c_ds_raw_intensity, c_ds_aln_intensity = np.interp(c_ds_raw, kde_x_raw, kde_y_raw), np.interp(c_ds_aln, kde_x_aln,
@@ -181,14 +192,16 @@ class WorkerSignals(QObject):
             peak_lists_aln, c_ds_aln_intensity = clean_peak_lists(peak_lists_aln, c_ds_aln_intensity)
             ####
 
-
-            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = alignment.munkres(peak_lists_raw,
+            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = alignment.munkres_align(peak_lists_raw,
                                                                                                  peak_lists_aln,
                                                                                                  c_ds_raw,
                                                                                                  c_ds_aln,
                                                                                                  c_ds_raw_intensity,
                                                                                                  c_ds_aln_intensity,
-                                                                                                 segmentation_threshold=400)
+                                                                                                 skip_fraction=0.3,
+                                                                                                 skip_level=0.4,
+                                                                                                 alpha_dist=0.15,
+                                                                                                 alpha_int=0.05)
 
             s_p = np.array(pd.DataFrame(np.array(
                 [stat_params_paired_single(x_el, y_el) for x_el, y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],
@@ -2341,8 +2354,16 @@ def stat_params_unpaired(ds):
         Array with columns: variance, dip statistic, dip p-value, skewness,
         kurtosis for each group.
     """
-    res = np.array([[np.var(dot), *diptest(dot), stats.skew(dot), stats.kurtosis(dot)] for dot in ds])
-    return res
+    res = []
+    for dot in ds:
+        dot = np.asarray(dot,dtype=float).ravel()
+
+        if len(dot) <= 1:
+            res.append([0.0, 0.0,1.0, 0.0, 0.0])
+            continue
+        statistics_info = [np.var(dot), *diptest(dot), stats.skew(dot), stats.kurtosis(dot)]
+        res.append(statistics_info)
+    return np.array(res)
 
 
 def moving_average(a, n=2):
