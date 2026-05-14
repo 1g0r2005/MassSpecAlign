@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import pyimzml
+import scipy.signal
 from pyimzml.ImzMLParser import ImzMLParser
 
 os.environ['PYQTGRAPH_QT_LIB'] = 'PyQt5'
@@ -150,6 +151,25 @@ class WorkerSignals(QObject):
             # восстановим высоту пиков
             max_center_r, max_center_a = np.interp(center_r, kde_x_raw, kde_y_raw), np.interp(center_a, kde_x_aln,
                                                                                             kde_y_aln)
+            ##временный код
+            grid = np.arange(min(min(raw_concat), min(aln_concat)), max(max(raw_concat), max(aln_concat))+Const.BW,Const.BW)
+            grid_intens_r, _ = np.histogram(center_r, bins=grid, weights=max_center_r)
+            grid_intens_a, _ = np.histogram(center_a, bins=grid, weights=max_center_a)
+            grid_centers = grid[:-1] + Const.BW / 2
+
+            correlation = scipy.signal.correlate(grid_intens_r, grid_intens_a,mode='full')
+            lags = scipy.signal.correlation_lags(len(grid_intens_r), len(grid_intens_a),mode='full')
+
+            optimal_lag = lags[np.argmax(correlation)] * Const.BW
+            print('Optimal lag: ' + str(optimal_lag))
+
+            left_a += optimal_lag
+            right_a += optimal_lag
+            center_a += optimal_lag
+            kde_x_aln += optimal_lag
+            aln_concat += optimal_lag
+
+
             print('Peak evaluation finished')
             borders_r = np.stack((left_r, right_r), axis=1)
             borders_a = np.stack((left_a, right_a), axis=1)
@@ -168,8 +188,6 @@ class WorkerSignals(QObject):
 
             print('Just before sortind')
             ##### заменили sort_dots на sorting_dots
-
-
 
             peak_lists_raw = sorting_dots(raw_concat, c_ds_raw.linked_array[:, 0], c_ds_raw.linked_array[:, 1])
             peak_lists_aln = sorting_dots(aln_concat, c_ds_aln.linked_array[:, 0], c_ds_aln.linked_array[:, 1])
@@ -190,7 +208,6 @@ class WorkerSignals(QObject):
             # Применяем очистку
             peak_lists_raw, c_ds_raw_intensity = clean_peak_lists(peak_lists_raw, c_ds_raw_intensity)
             peak_lists_aln, c_ds_aln_intensity = clean_peak_lists(peak_lists_aln, c_ds_aln_intensity)
-            ####
 
             aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = alignment.munkres_align(peak_lists_raw,
                                                                                                  peak_lists_aln,
@@ -202,14 +219,22 @@ class WorkerSignals(QObject):
                                                                                                  skip_level=0.4,
                                                                                                  alpha_dist=0.15,
                                                                                                  alpha_int=0.05)
-
+            '''
+            aln_peak_lists_raw, aln_peak_lists_aln, aln_kde_raw, aln_kde_aln = matching_lp.match_lp(peak_lists_raw,
+                                                                                                 peak_lists_aln,
+                                                                                                 c_ds_raw,
+                                                                                                 c_ds_aln,
+                                                                                                 c_ds_raw_intensity,
+                                                                                                 c_ds_aln_intensity)
+            '''
             s_p = np.array(pd.DataFrame(np.array(
                 [stat_params_paired_single(x_el, y_el) for x_el, y_el in zip(aln_peak_lists_raw, aln_peak_lists_aln)],
                 dtype='float')).dropna())
 
+
             result_text,result_type = construct_output(p_value=s_p[:,-1],
-                                                       var_raw=s_p[:,1],
-                                                       var_aln=s_p[:,2])
+                                                           var_raw=s_p[:,1],
+                                                           var_aln=s_p[:,2])
 
 
             ret = (
