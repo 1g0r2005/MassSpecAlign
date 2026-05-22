@@ -37,7 +37,6 @@ import pandas as pd
 
 ###
 from skimage.filters import  threshold_triangle
-
 ###
 """classes declaration"""
 

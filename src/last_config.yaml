@@ -1,10 +1,10 @@
 BW: 0.02
-DATASET_A: /roi2_e033/00/features
-DATASET_R: /roi2_e033/00/features
+DATASET_A: /roi1_e046/00/peaklists
+DATASET_R: /roi1_e046/00/peaklists
 DEV: 1.0
 FILE_NAMES: !!python/tuple
-- "C:/Users/doomu/OneDrive/\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\
-  /Distribution/Generate_specs/output/2_na.imzML"
-- "C:/Users/doomu/OneDrive/\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\
-  /Distribution/Generate_specs/output/2_n.imzML"
+- "C:/Users/doomu/OneDrive/\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\
+  \u043E\u043B/Test_2/roi_align_/roi_align__specdata.hdf5"
+- "C:/Users/doomu/OneDrive/\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\
+  \u043E\u043B/Test_2/roi_align_200_5/roi_align_200_5_specdata.hdf5"
 NDOTS: 100000
